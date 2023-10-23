@@ -1,0 +1,41 @@
+{
+  "databases": [
+    {
+      "name": "university",
+      "tables": [
+        {
+          "name": "students",
+          "attributes": [
+            {
+              "name": "id",
+              "type": "int",
+              "length": 100,
+              "isNull": false
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "length": 100,
+              "isNull": false
+            },
+            {
+              "name": "age",
+              "type": "int",
+              "length": 100,
+              "isNull": false
+            },
+            {
+              "name": "email",
+              "type": "string",
+              "length": 100,
+              "isNull": false
+            }
+          ],
+          "primaryKeys": [
+            "id"
+          ]
+        }
+      ]
+    }
+  ]
+}
