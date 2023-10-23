@@ -52,22 +52,22 @@ class DbmsiBackendApplicationTests {
 
 	@Test
 	void test() throws IOException {
-		Gson gson = new Gson();
-		List<Attribute> attributes = List.of(
-				new Attribute("id", "int", 100, false),
-				new Attribute("name", "string", 100, false),
-				new Attribute("age", "int", 100, false),
-				new Attribute("email", "string", 100, false)
-		);
-		List<Attribute> primary = List.of(
-				new Attribute("id", "int", 100, false)
-		);
-		Table table = Table
-				.builder()
-				.name("students")
-				.attributes(attributes)
-				.primaryKeys(primary)
-				.build();
-		System.out.println(gson.toJson(table));
+//		Gson gson = new Gson();
+//		List<Attribute> attributes = List.of(
+//				new Attribute("id", "int", 100, false),
+//				new Attribute("name", "string", 100, false),
+//				new Attribute("age", "int", 100, false),
+//				new Attribute("email", "string", 100, false)
+//		);
+//		List<Attribute> primary = List.of(
+//				new Attribute("id", "int", 100, false)
+//		);
+//		Table table = Table
+//				.builder()
+//				.name("students")
+//				.attributes(attributes)
+//				.primaryKeys(primary)
+//				.build();
+//		System.out.println(gson.toJson(table));
 	}
 }
