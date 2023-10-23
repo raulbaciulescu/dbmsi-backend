@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @AllArgsConstructor
 @RequestMapping(("/tables"))
+@CrossOrigin(origins = "http://localhost:3000")
 public class TableController {
     private TableService service;
 

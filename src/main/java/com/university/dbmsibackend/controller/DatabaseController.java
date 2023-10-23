@@ -12,6 +12,7 @@ import java.util.List;
 @RestController
 @AllArgsConstructor
 @RequestMapping(("/databases"))
+@CrossOrigin(origins = "http://localhost:3000")
 public class DatabaseController {
     private DatabaseService service;
 
