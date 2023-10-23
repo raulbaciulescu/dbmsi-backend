@@ -26,4 +26,10 @@ public class DatabaseController {
     public List<Database> getDatabases() {
         return service.getDatabases();
     }
+
+    @DeleteMapping("/{databaseName}")
+    @ResponseStatus(HttpStatus.OK)
+    public void dropDatabase(@PathVariable String databaseName) {
+        service.dropDatabase(databaseName);
+    }
 }

@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @AllArgsConstructor
@@ -21,7 +22,15 @@ public class DatabaseService {
         jsonUtil.saveCatalog(catalog);
     }
 
-    public void dropDatabase() {
+    public void dropDatabase(String databaseName) {
+        Catalog catalog = jsonUtil.getCatalog();
+        catalog.setDatabases(
+                catalog.getDatabases()
+                        .stream()
+                        .filter(db -> !Objects.equals(db.getName(), databaseName))
+                        .toList()
+        );
+        jsonUtil.saveCatalog(catalog);
     }
 
     public List<Database> getDatabases() {

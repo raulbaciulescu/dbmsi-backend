@@ -39,7 +39,21 @@ public class TableService {
         }
     }
 
-    public void dropTable() {
+    public void dropTable(String databaseName, String tableName) {
+        Catalog catalog = jsonUtil.getCatalog();
+        Optional<Database> optionalDatabase = catalog.getDatabases()
+                .stream()
+                .filter(db -> Objects.equals(db.getName(), databaseName))
+                .findFirst();
 
+        if (optionalDatabase.isPresent()) {
+            optionalDatabase.get().setTables(
+                    optionalDatabase.get().getTables()
+                            .stream()
+                            .filter(t -> !Objects.equals(t.getName(), tableName))
+                            .toList()
+            );
+            jsonUtil.saveCatalog(catalog);
+        }
     }
 }

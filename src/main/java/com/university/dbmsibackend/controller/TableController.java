@@ -19,4 +19,10 @@ public class TableController {
     public void createTable(@RequestBody CreateTableRequest request) {
         service.createTable(request);
     }
+
+    @DeleteMapping("/{databaseName}/{tableName}")
+    @ResponseStatus(HttpStatus.OK)
+    public void dropTable(@PathVariable String databaseName, @PathVariable String tableName) {
+        service.dropTable(databaseName, tableName);
+    }
 }
