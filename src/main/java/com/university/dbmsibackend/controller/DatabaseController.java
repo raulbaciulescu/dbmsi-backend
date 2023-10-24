@@ -2,6 +2,7 @@ package com.university.dbmsibackend.controller;
 
 import com.university.dbmsibackend.domain.Database;
 import com.university.dbmsibackend.dto.CreateDatabaseRequest;
+import com.university.dbmsibackend.exception.EntityAlreadyExistsException;
 import com.university.dbmsibackend.service.DatabaseService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,7 +19,7 @@ public class DatabaseController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.OK)
-    public void createDatabase(@RequestBody CreateDatabaseRequest request) {
+    public void createDatabase(@RequestBody CreateDatabaseRequest request) throws EntityAlreadyExistsException {
         service.createDatabase(request);
     }
 
