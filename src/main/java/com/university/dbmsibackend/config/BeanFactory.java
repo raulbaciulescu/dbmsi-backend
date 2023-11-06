@@ -1,4 +1,4 @@
-package com.university.dbmsibackend;
+package com.university.dbmsibackend.config;
 
 import com.university.dbmsibackend.util.JsonUtil;
 import org.springframework.context.annotation.Bean;
