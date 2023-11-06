@@ -35,13 +35,22 @@ public class TableController {
 
     @PostMapping("/insert")
     @ResponseStatus(HttpStatus.OK)
-    public void insert(@RequestBody InsertRequest request) {
-        insertService.insert(request);
+    public void insertRow(@RequestBody InsertRequest request) {
+        insertService.insertRow(request);
     }
 
     @GetMapping("/{databaseName}/{tableName}")
     @ResponseStatus(HttpStatus.OK)
     public List<SelectAllResponse> selectAll(@PathVariable String databaseName, @PathVariable String tableName) {
         return insertService.selectAll(databaseName, tableName);
+    }
+
+    @DeleteMapping("/delete-row/{databaseName}/{tableName}")
+    @ResponseStatus(HttpStatus.OK)
+    public void deleteRow(
+            @PathVariable String databaseName,
+            @PathVariable String tableName,
+            @RequestBody List<String> primaryKeys) {
+        insertService.deleteRow(databaseName, tableName, primaryKeys);
     }
 }
