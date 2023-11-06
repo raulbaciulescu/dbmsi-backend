@@ -73,6 +73,9 @@ public class TableService {
     public void insertRow(InsertRequest request) {
         MongoDatabase database = mongoClient.getDatabase(request.databaseName());
         MongoCollection<Document> collection = database.getCollection(request.tableName() + ".kv");
+        if (!DbsmiValidator.isValidRow(collection, request)) {
+            throw new EntityAlreadyExistsException("A row with that primary key exists!");
+        }
         Document document = new Document("key", request.key())
                 .append("value", request.value());
 
