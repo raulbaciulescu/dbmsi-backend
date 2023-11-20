@@ -25,6 +25,7 @@ public class TableController {
     }
 
     @DeleteMapping("/{databaseName}/{tableName}")
+    @CrossOrigin(origins = "http://localhost:3000")
     @ResponseStatus(HttpStatus.OK)
     public void dropTable(@PathVariable String databaseName, @PathVariable String tableName) {
         service.dropTable(databaseName, tableName);

@@ -16,10 +16,8 @@ import lombok.AllArgsConstructor;
 import org.bson.Document;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @AllArgsConstructor
@@ -95,18 +93,86 @@ public class TableService {
                 .stream()
                 .filter(db -> Objects.equals(db.getName(), request.databaseName()))
                 .findFirst();
+        MongoDatabase database = mongoClient.getDatabase(request.databaseName());
         if (optionalDatabase.isPresent()) {
             Optional<Table> optionalTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), request.tableName())).findFirst();
+
+            optionalTable.ifPresent(table -> {
+                Dictionary tableEntry = mapKeyValueToTableRow(request.key(), request.value(), table);
+                AtomicBoolean doForeignValuesExist = new AtomicBoolean(true);
+                table.getForeignKeys().forEach(foreignKey -> {
+                    AtomicBoolean doesForeignValueExist = new AtomicBoolean(false);
+                    String foreignTableName = foreignKey.getReferenceTable();
+                    List<Attribute> attributes = foreignKey.getAttributes();
+                    List<Attribute> foreignAttributes = foreignKey.getReferenceAttributes();
+                    Optional<Table> optionalForeignTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), foreignTableName)).findFirst();
+                    optionalForeignTable.ifPresent(foreignTable -> {
+                        MongoCollection<Document> collection = database.getCollection( foreignTable.getName() + ".kv");
+                        for (Document document : collection.find()) {
+                            Dictionary foreignTableEntry = mapMongoEntryToTableRow(document, foreignTable);
+                            for (int i = 0; i < foreignKey.getReferenceAttributes().size(); i++) {
+                                var foreignValue = foreignTableEntry.get(foreignAttributes.get(i).getName());
+                                var value = tableEntry.get(attributes.get(i).getName());
+                                if (Objects.equals(
+                                        foreignValue,
+                                        value)) {
+                                    doesForeignValueExist.set(true);
+                                }
+                            }
+                        }
+                    });
+                    if (!doesForeignValueExist.get()) {
+                        doForeignValuesExist.set(false);
+                    }
+                });
+                if (!doForeignValuesExist.get()) {
+                    throw new ForeignKeyViolationException("Foreign keys values don't exist!");
+                }
+            });
+
             optionalTable.ifPresent(table -> indexService.insertInIndexFiles(table, request));
         }
 
-        MongoDatabase database = mongoClient.getDatabase(request.databaseName());
         MongoCollection<Document> collection = database.getCollection(request.tableName() + ".kv");
         if (!DbsmiValidator.isValidRow(collection, request)) {
             throw new EntityAlreadyExistsException("A row with that primary key exists!");
         }
         Document document = new Document("_id", request.key()).append("value", request.value());
         collection.insertOne(document);
+    }
+
+    private Dictionary mapMongoEntryToTableRow(Document mongoEntry, Table table) {
+        Dictionary resultRow = new Hashtable();
+        String[] primaryKeys = mongoEntry.get("_id").toString().split("#", -1);
+        String[] values = mongoEntry.get("value").toString().split("#", -1);
+        int primaryKeysIndex = 0, valuesIndex = 0;
+        for (Attribute attribute : table.getAttributes()) {
+            if (table.getPrimaryKeys().contains(attribute.getName())) {
+                resultRow.put(attribute.getName(), primaryKeys[primaryKeysIndex]);
+                primaryKeysIndex++;
+            } else {
+                resultRow.put(attribute.getName(), values[valuesIndex]);
+                valuesIndex++;
+            }
+        }
+        return resultRow;
+    }
+
+    private Dictionary mapKeyValueToTableRow(String key, String value, Table table) {
+        Dictionary resultRow = new Hashtable();
+        String[] primaryKeys = key.split("#", -1);
+        String[] values = value.split("#", -1);
+        int primaryKeysIndex = 0, valuesIndex = 0;
+        for (Attribute attribute : table.getAttributes()) {
+            if (table.getPrimaryKeys().contains(attribute.getName())) {
+                resultRow.put(attribute.getName(), primaryKeys[primaryKeysIndex]);
+                primaryKeysIndex++;
+            } else {
+                resultRow.put(attribute.getName(), values[valuesIndex]);
+                valuesIndex++;
+            }
+        }
+        return resultRow;
     }
 
     public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
