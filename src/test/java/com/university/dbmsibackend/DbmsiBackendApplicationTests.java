@@ -1,17 +1,11 @@
 package com.university.dbmsibackend;
 
 import com.google.gson.Gson;
-import com.university.dbmsibackend.domain.Attribute;
-import com.university.dbmsibackend.domain.Database;
-import com.university.dbmsibackend.domain.PrimaryKey;
-import com.university.dbmsibackend.domain.Table;
-import com.university.dbmsibackend.util.JsonUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
 @SpringBootTest
 class DbmsiBackendApplicationTests {

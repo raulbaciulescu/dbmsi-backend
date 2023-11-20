@@ -13,5 +13,5 @@ public class Attribute {
     private String name;
     private String type;
     private Integer length;
-    private Boolean isNull;
+    private Boolean isUnique;
 }

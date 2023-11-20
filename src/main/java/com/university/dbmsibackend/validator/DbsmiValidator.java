@@ -20,9 +20,10 @@ public class DbsmiValidator {
     }
 
     public static boolean isValidRow(MongoCollection<Document> collection, InsertRequest request) {
+        // check for primary key
         String primaryKey = request.key();
         for (Document document : collection.find()) {
-            if (Objects.equals(primaryKey, document.get("key").toString()))
+            if (Objects.equals(primaryKey, document.get("_id").toString()))
                 return false;
         }
         return true;
