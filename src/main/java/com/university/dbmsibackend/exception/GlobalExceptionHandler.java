@@ -25,4 +25,12 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(errorDetails, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler(ForeignKeyViolationException.class)
+    public ResponseEntity<?> handleForeignKeyViolationException(ForeignKeyViolationException exception, WebRequest request) {
+        ErrorDetails errorDetails =
+                new ErrorDetails(new Date(), "foreign-key-exception", exception.getMessage(), String.valueOf(HttpStatus.BAD_REQUEST.value()));
+
+        return new ResponseEntity<>(errorDetails, HttpStatus.BAD_REQUEST);
+    }
 }

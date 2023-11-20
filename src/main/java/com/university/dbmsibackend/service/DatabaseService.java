@@ -1,5 +1,7 @@
 package com.university.dbmsibackend.service;
 
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoDatabase;
 import com.university.dbmsibackend.domain.Catalog;
 import com.university.dbmsibackend.domain.Database;
 import com.university.dbmsibackend.dto.CreateDatabaseRequest;
@@ -16,6 +18,7 @@ import java.util.Objects;
 @AllArgsConstructor
 public class DatabaseService {
     private JsonUtil jsonUtil;
+    private MongoClient mongoClient;
 
     public void createDatabase(CreateDatabaseRequest request) throws EntityAlreadyExistsException {
         Database database = new Database(request.name());
@@ -36,10 +39,16 @@ public class DatabaseService {
                         .toList()
         );
         jsonUtil.saveCatalog(catalog);
+        dropDatabaseFromMongo(databaseName);
     }
 
     public List<Database> getDatabases() {
         Catalog catalog = jsonUtil.getCatalog();
         return catalog.getDatabases();
+    }
+
+    private void dropDatabaseFromMongo(String databaseName) {
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        database.drop();
     }
 }

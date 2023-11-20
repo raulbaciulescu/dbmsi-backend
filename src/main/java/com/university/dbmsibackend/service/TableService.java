@@ -9,6 +9,7 @@ import com.university.dbmsibackend.dto.CreateTableRequest;
 import com.university.dbmsibackend.dto.InsertRequest;
 import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.exception.EntityAlreadyExistsException;
+import com.university.dbmsibackend.exception.ForeignKeyViolationException;
 import com.university.dbmsibackend.util.JsonUtil;
 import com.university.dbmsibackend.validator.DbsmiValidator;
 import lombok.AllArgsConstructor;
@@ -19,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
@@ -62,6 +62,7 @@ public class TableService {
                 .findFirst();
 
         if (optionalDatabase.isPresent()) {
+            checkIfTableIsLinkedWithOtherTables(optionalDatabase.get(), tableName);
             optionalDatabase.get().setTables(
                     optionalDatabase.get().getTables()
                             .stream()
@@ -69,6 +70,22 @@ public class TableService {
                             .toList()
             );
             jsonUtil.saveCatalog(catalog);
+            dropTableFromMongo(tableName, databaseName);
+        }
+    }
+
+    private void dropTableFromMongo(String tableName, String databaseName) {
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+        collection.drop();
+    }
+
+    private void checkIfTableIsLinkedWithOtherTables(Database database, String tableName) {
+        for (Table table: database.getTables()) {
+            for (ForeignKey foreignKey : table.getForeignKeys()) {
+                if (Objects.equals(foreignKey.getReferenceTable(), tableName))
+                    throw new ForeignKeyViolationException("Table is linked to " + foreignKey.getReferenceTable() + " table!");
+            }
         }
     }
 
