@@ -56,8 +56,8 @@ public class IndexService {
         List<Index> indexList = table.getIndexes();
         for (Index index : indexList) {
             List<String> indexValues = getValuesForIndexAttributes(index, table, request);
-//            if (index.getIsUnique())
-//                checkForErrors(request, String.join("#", indexValues), index.getName());
+            if (index.getIsUnique())
+                checkForErrors(request, String.join("#", indexValues), index.getName());
         }
 
         for (Index index : indexList) {
@@ -66,6 +66,16 @@ public class IndexService {
                 insertInUniqueIndex(request, String.join("#", indexValues), index.getName());
             } else
                 insertInNonUniqueIndex(request, String.join("#", indexValues), index.getName());
+        }
+    }
+
+    private void checkForErrors(InsertRequest request, String uniqueKey, String indexName) {
+        MongoDatabase database = mongoClient.getDatabase(request.databaseName());
+        MongoCollection<Document> collection = database.getCollection(request.tableName() + "_" + indexName + ".ind");
+        Document query = new Document("_id", uniqueKey);
+        Document result = collection.find(query).first();
+        if (result != null) {
+            throw new EntityAlreadyExistsException("Unique key already exists!");
         }
     }
 
