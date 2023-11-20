@@ -2,6 +2,7 @@ package com.university.dbmsibackend.validator;
 
 import com.mongodb.client.MongoCollection;
 import com.university.dbmsibackend.domain.Database;
+import com.university.dbmsibackend.domain.Table;
 import com.university.dbmsibackend.dto.InsertRequest;
 import org.bson.Document;
 

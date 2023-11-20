@@ -4,11 +4,7 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.result.UpdateResult;
 import com.university.dbmsibackend.domain.*;
-import com.university.dbmsibackend.dto.CreateIndexRequest;
 import com.university.dbmsibackend.dto.CreateTableRequest;
 import com.university.dbmsibackend.dto.InsertRequest;
 import com.university.dbmsibackend.dto.SelectAllResponse;
@@ -17,7 +13,6 @@ import com.university.dbmsibackend.util.JsonUtil;
 import com.university.dbmsibackend.validator.DbsmiValidator;
 import lombok.AllArgsConstructor;
 import org.bson.Document;
-import org.bson.conversions.Bson;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -78,14 +73,6 @@ public class TableService {
     }
 
     public void insertRow(InsertRequest request) {
-        MongoDatabase database = mongoClient.getDatabase(request.databaseName());
-        MongoCollection<Document> collection = database.getCollection(request.tableName() + ".kv");
-        if (!DbsmiValidator.isValidRow(collection, request)) {
-            throw new EntityAlreadyExistsException("A row with that primary key exists!");
-        }
-        Document document = new Document("_id", request.key()).append("value", request.value());
-        collection.insertOne(document);
-
         Catalog catalog = jsonUtil.getCatalog();
         Optional<Database> optionalDatabase = catalog.getDatabases()
                 .stream()
@@ -93,37 +80,16 @@ public class TableService {
                 .findFirst();
         if (optionalDatabase.isPresent()) {
             Optional<Table> optionalTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), request.tableName())).findFirst();
-            if (optionalTable.isPresent()) {
-                List<Index> indexList = optionalTable.get().getIndexes();
-                for (Index index : indexList) {
-                    List<String> attributesValue = List.of(request.value().split("#"));
-                    List<String> indexAttributes = index.getAttributes().stream().map(Attribute::getName).toList();
-                    int untilPrimaryKey = optionalTable.get().getPrimaryKeys().size();
-
-                    List<String> attributes = optionalTable.get()
-                            .getAttributes()
-                            .stream()
-                            .map(Attribute::getName)
-                            .collect(Collectors.toList());
-                    attributes.subList(0, untilPrimaryKey).clear();
-                    System.out.println("attributes value: " + attributesValue);
-                    System.out.println("attributes: " + attributes);
-                    // firstName, lastName, unique, something
-                    // da, da, a, da
-                    List<String> indexValues = new ArrayList<>();
-                    for (int i = 0; i < attributes.size(); i++) {
-                        if (indexAttributes.contains(attributes.get(i)))
-                            indexValues.add(attributesValue.get(i));
-                    }
-                    System.out.println("index value: " + indexValues);
-                    if (index.getIsUnique()) {
-                        indexService.insertInUniqueIndex(request, String.join("#", indexValues), index.getName());
-                    }
-                    else
-                        indexService.insertInNonUniqueIndex(request, String.join("#", indexValues), index.getName());
-                }
-            }
+            optionalTable.ifPresent(table -> indexService.insertInIndexFiles(table, request));
         }
+
+        MongoDatabase database = mongoClient.getDatabase(request.databaseName());
+        MongoCollection<Document> collection = database.getCollection(request.tableName() + ".kv");
+        if (!DbsmiValidator.isValidRow(collection, request)) {
+            throw new EntityAlreadyExistsException("A row with that primary key exists!");
+        }
+        Document document = new Document("_id", request.key()).append("value", request.value());
+        collection.insertOne(document);
     }
 
     public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
