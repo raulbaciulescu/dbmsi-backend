@@ -84,7 +84,7 @@ public class TableService {
         for (Table table: database.getTables()) {
             for (ForeignKey foreignKey : table.getForeignKeys()) {
                 if (Objects.equals(foreignKey.getReferenceTable(), tableName))
-                    throw new ForeignKeyViolationException("Table is linked to " + foreignKey.getReferenceTable() + " table!");
+                    throw new ForeignKeyViolationException("Table is linked to " + table.getName() + " table!");
             }
         }
     }
