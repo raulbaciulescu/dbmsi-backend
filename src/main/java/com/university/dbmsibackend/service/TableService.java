@@ -98,7 +98,7 @@ public class TableService {
             Optional<Table> optionalTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), request.tableName())).findFirst();
 
             optionalTable.ifPresent(table -> {
-                Dictionary tableEntry = mapKeyValueToTableRow(request.key(), request.value(), table);
+                Dictionary<String, String> tableEntry = mapKeyValueToTableRow(request.key(), request.value(), table);
                 AtomicBoolean doForeignValuesExist = new AtomicBoolean(true);
                 table.getForeignKeys().forEach(foreignKey -> {
                     AtomicBoolean doesForeignValueExist = new AtomicBoolean(false);
@@ -109,7 +109,7 @@ public class TableService {
                     optionalForeignTable.ifPresent(foreignTable -> {
                         MongoCollection<Document> collection = database.getCollection(foreignTable.getName() + ".kv");
                         for (Document document : collection.find()) {
-                            Dictionary foreignTableEntry = mapMongoEntryToTableRow(document, foreignTable);
+                            Dictionary<String, String> foreignTableEntry = mapMongoEntryToTableRow(document, foreignTable);
                             for (int i = 0; i < foreignKey.getReferenceAttributes().size(); i++) {
                                 var foreignValue = foreignTableEntry.get(foreignAttributes.get(i).getName());
                                 var value = tableEntry.get(attributes.get(i).getName());
@@ -141,27 +141,21 @@ public class TableService {
         collection.insertOne(document);
     }
 
-    private Dictionary mapMongoEntryToTableRow(Document mongoEntry, Table table) {
-        Dictionary resultRow = new Hashtable();
+    private Dictionary<String, String> mapMongoEntryToTableRow(Document mongoEntry, Table table) {
         String[] primaryKeys = mongoEntry.get("_id").toString().split("#", -1);
         String[] values = mongoEntry.get("value").toString().split("#", -1);
-        int primaryKeysIndex = 0, valuesIndex = 0;
-        for (Attribute attribute : table.getAttributes()) {
-            if (table.getPrimaryKeys().contains(attribute.getName())) {
-                resultRow.put(attribute.getName(), primaryKeys[primaryKeysIndex]);
-                primaryKeysIndex++;
-            } else {
-                resultRow.put(attribute.getName(), values[valuesIndex]);
-                valuesIndex++;
-            }
-        }
-        return resultRow;
+        return mapToTableRow(table, primaryKeys, values);
     }
 
-    private Dictionary mapKeyValueToTableRow(String key, String value, Table table) {
-        Dictionary resultRow = new Hashtable();
+    private Dictionary<String, String> mapKeyValueToTableRow(String key, String value, Table table) {
         String[] primaryKeys = key.split("#", -1);
         String[] values = value.split("#", -1);
+        return mapToTableRow(table, primaryKeys, values);
+    }
+
+    private Dictionary<String, String> mapToTableRow(Table table, String[] primaryKeys, String[] values) {
+        Dictionary<String, String> resultRow = new Hashtable<>();
+
         int primaryKeysIndex = 0, valuesIndex = 0;
         for (Attribute attribute : table.getAttributes()) {
             if (table.getPrimaryKeys().contains(attribute.getName())) {
@@ -242,7 +236,7 @@ public class TableService {
             for (ForeignKey foreignKey : referenceTable.getForeignKeys()) {
                 List<String> attributeNames = foreignKey.getReferenceAttributes().stream().map(Attribute::getName).toList();
                 StringBuilder key = new StringBuilder();
-                for (String atrName: attributeNames) {
+                for (String atrName : attributeNames) {
                     key.append(resultRow.get(atrName));
                 }
                 if (existsForeignKeyInIndexFile(key.toString(), foreignKey.getName(), referenceTable.getName(), databaseName))
