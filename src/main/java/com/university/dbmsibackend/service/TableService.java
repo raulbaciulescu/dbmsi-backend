@@ -79,7 +79,7 @@ public class TableService {
     }
 
     private void checkIfTableIsLinkedWithOtherTables(Database database, String tableName) {
-        for (Table table: database.getTables()) {
+        for (Table table : database.getTables()) {
             for (ForeignKey foreignKey : table.getForeignKeys()) {
                 if (Objects.equals(foreignKey.getReferenceTable(), tableName))
                     throw new ForeignKeyViolationException("Table is linked to " + table.getName() + " table!");
@@ -107,7 +107,7 @@ public class TableService {
                     List<Attribute> foreignAttributes = foreignKey.getReferenceAttributes();
                     Optional<Table> optionalForeignTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), foreignTableName)).findFirst();
                     optionalForeignTable.ifPresent(foreignTable -> {
-                        MongoCollection<Document> collection = database.getCollection( foreignTable.getName() + ".kv");
+                        MongoCollection<Document> collection = database.getCollection(foreignTable.getName() + ".kv");
                         for (Document document : collection.find()) {
                             Dictionary foreignTableEntry = mapMongoEntryToTableRow(document, foreignTable);
                             for (int i = 0; i < foreignKey.getReferenceAttributes().size(); i++) {
@@ -188,13 +188,81 @@ public class TableService {
     }
 
     public void deleteRow(String databaseName, String tableName, List<String> primaryKeys) {
+        Catalog catalog = jsonUtil.getCatalog();
+        Optional<Database> optionalDatabase = catalog.getDatabases()
+                .stream()
+                .filter(db -> Objects.equals(db.getName(), databaseName))
+                .findFirst();
+        if (optionalDatabase.isPresent()) {
+            Optional<Table> optionalTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), tableName)).findFirst();
+            if (optionalTable.isPresent()) {
+                MongoDatabase database = mongoClient.getDatabase(databaseName);
+                MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+                FindIterable<Document> documents = collection.find();
+                List<Table> linkedForeignKeys = getLinkedTableWithForeignKey(databaseName, tableName);
+                for (Document document : documents) {
+                    if (primaryKeys.stream().anyMatch(s -> Objects.equals(s, document.get("_id").toString())))
+                        if (!existsContainsForeignKeys(document, optionalTable.get(), linkedForeignKeys, databaseName))
+                            collection.deleteMany(document);
+                        else
+                            throw new ForeignKeyViolationException("A foreign key is used in other table!");
+                }
+            }
+        }
+
+
+    }
+
+    private List<Table> getLinkedTableWithForeignKey(String databaseName, String tableName) {
+        Catalog catalog = jsonUtil.getCatalog();
+        Optional<Database> optionalDatabase = catalog.getDatabases()
+                .stream()
+                .filter(db -> Objects.equals(db.getName(), databaseName))
+                .findFirst();
+        List<Table> linkedForeignKeys = new ArrayList<>();
+        optionalDatabase.ifPresent(db ->
+                db.getTables().forEach(table ->
+                        table.getForeignKeys().forEach(fk -> {
+                                    if (Objects.equals(fk.getReferenceTable(), tableName))
+                                        linkedForeignKeys.add(table);
+                                }
+                        ))
+        );
+
+        return linkedForeignKeys;
+    }
+
+    private boolean existsContainsForeignKeys(Document document, Table table, List<Table> referenceTables, String databaseName) {
+        // document are id ul groupului pe care vreau sa l sterg
+        Dictionary<String, String> resultRow = mapKeyValueToTableRow(document.getString("_id"), document.getString("value"), table);
+        // {id: 1, name: "da", uniqueField: "DA"}
+
+        boolean check = false;
+        for (Table referenceTable : referenceTables) {
+            for (ForeignKey foreignKey : referenceTable.getForeignKeys()) {
+                List<String> attributeNames = foreignKey.getReferenceAttributes().stream().map(Attribute::getName).toList();
+                StringBuilder key = new StringBuilder();
+                for (String atrName: attributeNames) {
+                    key.append(resultRow.get(atrName));
+                }
+                if (existsForeignKeyInIndexFile(key.toString(), foreignKey.getName(), referenceTable.getName(), databaseName))
+                    check = true;
+            }
+
+        }
+
+        return check;
+    }
+
+    private boolean existsForeignKeyInIndexFile(String checkedKey, String foreignKeyName, String tableName, String databaseName) {
         MongoDatabase database = mongoClient.getDatabase(databaseName);
-        MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+        MongoCollection<Document> collection = database.getCollection(tableName + "_" + foreignKeyName + ".ind");
         FindIterable<Document> documents = collection.find();
         for (Document document : documents) {
-            if (primaryKeys.stream().anyMatch(s -> Objects.equals(s, document.get("_id").toString())))
-                collection.deleteMany(document);
+            if (Objects.equals(checkedKey, document.get("_id").toString()))
+                return true;
         }
+        return false;
     }
 
     private void createTableInMongo(String tableName, String databaseName) {
