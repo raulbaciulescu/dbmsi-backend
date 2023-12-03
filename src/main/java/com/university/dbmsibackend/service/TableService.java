@@ -11,6 +11,7 @@ import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.exception.EntityAlreadyExistsException;
 import com.university.dbmsibackend.exception.ForeignKeyViolationException;
 import com.university.dbmsibackend.util.JsonUtil;
+import com.university.dbmsibackend.util.TableMapper;
 import com.university.dbmsibackend.validator.DbsmiValidator;
 import lombok.AllArgsConstructor;
 import org.bson.Document;
@@ -98,7 +99,7 @@ public class TableService {
             Optional<Table> optionalTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), request.tableName())).findFirst();
 
             optionalTable.ifPresent(table -> {
-                Dictionary<String, String> tableEntry = mapKeyValueToTableRow(request.key(), request.value(), table);
+                Dictionary<String, String> tableEntry = TableMapper.mapKeyValueToTableRow(request.key(), request.value(), table);
                 AtomicBoolean doForeignValuesExist = new AtomicBoolean(true);
                 table.getForeignKeys().forEach(foreignKey -> {
                     AtomicBoolean doesForeignValueExist = new AtomicBoolean(false);
@@ -109,7 +110,7 @@ public class TableService {
                     optionalForeignTable.ifPresent(foreignTable -> {
                         MongoCollection<Document> collection = database.getCollection(foreignTable.getName() + ".kv");
                         for (Document document : collection.find()) {
-                            Dictionary<String, String> foreignTableEntry = mapMongoEntryToTableRow(document, foreignTable);
+                            Dictionary<String, String> foreignTableEntry = TableMapper.mapMongoEntryToTableRow(document, foreignTable);
                             for (int i = 0; i < foreignKey.getReferenceAttributes().size(); i++) {
                                 var foreignValue = foreignTableEntry.get(foreignAttributes.get(i).getName());
                                 var value = tableEntry.get(attributes.get(i).getName());
@@ -139,34 +140,6 @@ public class TableService {
         }
         Document document = new Document("_id", request.key()).append("value", request.value());
         collection.insertOne(document);
-    }
-
-    private Dictionary<String, String> mapMongoEntryToTableRow(Document mongoEntry, Table table) {
-        String[] primaryKeys = mongoEntry.get("_id").toString().split("#", -1);
-        String[] values = mongoEntry.get("value").toString().split("#", -1);
-        return mapToTableRow(table, primaryKeys, values);
-    }
-
-    private Dictionary<String, String> mapKeyValueToTableRow(String key, String value, Table table) {
-        String[] primaryKeys = key.split("#", -1);
-        String[] values = value.split("#", -1);
-        return mapToTableRow(table, primaryKeys, values);
-    }
-
-    private Dictionary<String, String> mapToTableRow(Table table, String[] primaryKeys, String[] values) {
-        Dictionary<String, String> resultRow = new Hashtable<>();
-
-        int primaryKeysIndex = 0, valuesIndex = 0;
-        for (Attribute attribute : table.getAttributes()) {
-            if (table.getPrimaryKeys().contains(attribute.getName())) {
-                resultRow.put(attribute.getName(), primaryKeys[primaryKeysIndex]);
-                primaryKeysIndex++;
-            } else {
-                resultRow.put(attribute.getName(), values[valuesIndex]);
-                valuesIndex++;
-            }
-        }
-        return resultRow;
     }
 
     public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
@@ -203,8 +176,6 @@ public class TableService {
                 }
             }
         }
-
-
     }
 
     private List<Table> getLinkedTableWithForeignKey(String databaseName, String tableName) {
@@ -228,7 +199,7 @@ public class TableService {
 
     private boolean existsContainsForeignKeys(Document document, Table table, List<Table> referenceTables, String databaseName) {
         // document are id ul groupului pe care vreau sa l sterg
-        Dictionary<String, String> resultRow = mapKeyValueToTableRow(document.getString("_id"), document.getString("value"), table);
+        Dictionary<String, String> resultRow = TableMapper.mapKeyValueToTableRow(document.getString("_id"), document.getString("value"), table);
         // {id: 1, name: "da", uniqueField: "DA"}
 
         boolean check = false;
@@ -242,7 +213,6 @@ public class TableService {
                 if (existsForeignKeyInIndexFile(key.toString(), foreignKey.getName(), referenceTable.getName(), databaseName))
                     check = true;
             }
-
         }
 
         return check;
