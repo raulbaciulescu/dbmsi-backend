@@ -6,6 +6,9 @@ import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @AllArgsConstructor
 @RequestMapping(("/sqlCommand"))
@@ -15,8 +18,8 @@ public class QueryController {
     
     @PostMapping
     @ResponseStatus(HttpStatus.OK)
-    public void query(@RequestBody QueryRequest request){
-        service.executeQuery(request);
+    public List<Map<String, Object>> query(@RequestBody QueryRequest request){
+        return service.executeQuery(request);
     }
 
 }
