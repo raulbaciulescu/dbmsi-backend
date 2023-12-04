@@ -19,12 +19,14 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
 public class TableService {
     private JsonUtil jsonUtil;
     private MongoClient mongoClient;
+    private MongoService mongoService;
     private IndexService indexService;
 
     public void createTable(CreateTableRequest request) {
@@ -143,15 +145,7 @@ public class TableService {
     }
 
     public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
-        MongoDatabase database = mongoClient.getDatabase(databaseName);
-        MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
-        FindIterable<Document> documents = collection.find();
-        List<SelectAllResponse> response = new ArrayList<>();
-        for (Document document : documents) {
-            response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
-        }
-
-        return response;
+        return mongoService.selectAll(databaseName, tableName);
     }
 
     public void deleteRow(String databaseName, String tableName, List<String> primaryKeys) {
@@ -169,13 +163,42 @@ public class TableService {
                 List<Table> linkedForeignKeys = getLinkedTableWithForeignKey(databaseName, tableName);
                 for (Document document : documents) {
                     if (primaryKeys.stream().anyMatch(s -> Objects.equals(s, document.get("_id").toString())))
-                        if (!existsContainsForeignKeys(document, optionalTable.get(), linkedForeignKeys, databaseName))
-                            collection.deleteMany(document);
-                        else
+                        if (!existsContainsForeignKeys(document, optionalTable.get(), linkedForeignKeys, databaseName)) {
+                            collection.deleteOne(document);
+                            deleteFromIndexFiles(optionalTable.get(), databaseName, document);
+                        } else
                             throw new ForeignKeyViolationException("A foreign key is used in other table!");
                 }
             }
         }
+    }
+
+    private void deleteFromIndexFiles(Table table, String databaseName, Document document) {
+        table.getIndexes().forEach(index -> {
+            MongoDatabase database = mongoService.getDatabase(databaseName);
+            MongoCollection<Document> collection = database.getCollection(table.getName() + "_" + index.getName() + ".ind");
+            if (index.getIsUnique()) {
+                Document query = new Document("primary-key", document.get("_id"));
+                collection.deleteOne(query);
+            } else {
+                FindIterable<Document> documents = collection.find();
+                for (Document d : documents) {
+                    String s = d.get("primary-key").toString();
+                    List<String> sList = List.of(s.split("\\$"));
+                    if (sList.contains(document.get("_id").toString())) {
+                        String updatedPrimaryKeys = sList.stream()
+                                .filter(dString ->
+                                        !Objects.equals(dString, document.get("_id").toString()))
+                                .collect(Collectors.joining("$"));
+                        Document update = new Document("$set", new Document("_id", d.get("_id")).append("primary-key", updatedPrimaryKeys));
+                        if (updatedPrimaryKeys.equals(""))
+                            collection.deleteOne(d);
+                        else
+                            collection.updateOne(d, update);
+                    }
+                }
+            }
+        });
     }
 
     private List<Table> getLinkedTableWithForeignKey(String databaseName, String tableName) {
