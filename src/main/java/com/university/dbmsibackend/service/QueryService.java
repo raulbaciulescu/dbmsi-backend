@@ -6,6 +6,7 @@ import com.university.dbmsibackend.domain.Table;
 import com.university.dbmsibackend.dto.QueryRequest;
 import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.util.JsonUtil;
+import com.university.dbmsibackend.util.TableMapper;
 import lombok.AllArgsConstructor;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
@@ -14,21 +15,26 @@ import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 
 import java.util.*;
 
 @Service
-@AllArgsConstructor
 public class QueryService {
+    @Autowired
     private MongoClient mongoClient;
+    @Autowired
     private MongoService mongoService;
+    @Autowired
     private JsonUtil jsonUtil;
+    private String databaseName;
 
     public List<Map<String, Object>> executeQuery(QueryRequest request) {
         System.out.println(request.query());
         String query = request.query();
-        String databaseName = request.databaseName();
+        databaseName = request.databaseName();
         try {
             // Parse the SQL query
             Statement statement = CCJSqlParserUtil.parse(query);
@@ -68,11 +74,24 @@ public class QueryService {
                 result.add(jsonRow);
             }
 
-            var expression = plainSelect.getWhere();
-            if (expression != null) {
-                result = handleWhereClause(result, expression);
+            var whereExpression = plainSelect.getWhere();
+            if (whereExpression != null) {
+                result = handleWhereClause(result, whereExpression);
             }
 
+            // Print JOINs
+            List<Map<String, String>> resultOfJoins = new ArrayList<>();
+            if (plainSelect.getJoins() != null) {
+                for (Join join : plainSelect.getJoins()) {
+                    String joinTableName = join.getRightItem().toString();
+                    Expression expression = join.getOnExpression();
+                    if (resultOfJoins.isEmpty())
+                        resultOfJoins = firstJoin(expression);
+                    else
+                        resultOfJoins = secondJoin(resultOfJoins, expression);
+                    System.out.println("Result: " + resultOfJoins);
+                }
+            }
 
             List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
             List<String> selectedItems = selectItems
@@ -80,23 +99,6 @@ public class QueryService {
                     .map(SelectItem::toString)
                     .toList();
             result = selectSimpleQuery(result, selectedItems);
-
-//            // Print JOINs
-//            if (plainSelect.getJoins() != null) {
-//                for (Join join : plainSelect.getJoins()) {
-//                    printNode("Join", indentLevel);
-////                    printNode("JoinType: " + join.(), indentLevel + 1);
-//                    printNode("RightItem", indentLevel + 1);
-//                    printNode("Table: " + join.getRightItem(), indentLevel + 2);
-//                    printNode("OnExpression", indentLevel + 1);
-//                    printExpressionTree(join.getOnExpression(), indentLevel + 2);
-//                }
-//            }
-
-            // Print WHERE
-//            if (plainSelect.getWhere() != null) {
-//                printExpressionTree(plainSelect.getWhere(),);
-//            }
 
             return result;
         } else throw new Exception("DA");
@@ -197,8 +199,142 @@ public class QueryService {
         }
     }
 
+    private List<Map<String, String>> secondJoin(List<Map<String, String>> firstJoinList, Expression expression) {
+        List<Map<String, String>> commonList = new ArrayList<>();
+        if (expression instanceof EqualsTo equalsTo) {
+            Expression leftExpression = equalsTo.getLeftExpression();
+            Expression rightExpression = equalsTo.getRightExpression();
+            String leftParameter = leftExpression.toString();
+            String rightParameter = rightExpression.toString();
+
+            String tableName1 = Arrays.stream(leftParameter.split("\\.")).toList().get(0);
+            String column1 = Arrays.stream(leftParameter.split("\\.")).toList().get(1);
+
+            String tableName2 = Arrays.stream(rightParameter.split("\\.")).toList().get(0);
+            String column2 = Arrays.stream(rightParameter.split("\\.")).toList().get(1);
+
+            Table table1 = jsonUtil.getTable(tableName1, databaseName);
+            Table table2 = jsonUtil.getTable(tableName2, databaseName);
+
+            List<SelectAllResponse> table1Rows = mongoService.selectAll(databaseName, tableName1);
+            List<SelectAllResponse> table2Rows = mongoService.selectAll(databaseName, tableName2);
+            List<Map<String, String>> table1RowsJsons = table1Rows
+                    .stream()
+                    .map(s -> dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table1)))
+                    .toList();
+            List<Map<String, String>> table2RowsJsons = table2Rows
+                    .stream()
+                    .map(s -> dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table2)))
+                    .toList();
+
+            for (Map<String, String> json1 : firstJoinList) {
+                if (json1.containsKey(tableName1 + "." + column1)) {
+                    var result = table2RowsJsons
+                            .stream()
+                            .filter(json2 -> Objects.equals(json2.get(column2), json1.get(tableName1 + "." + column1)))
+                            .toList();
+                    if (!result.isEmpty()) {
+                        for (Map<String, String> json2 : result) {
+                            Map<String, String> jsonResult = new HashMap<>();
+                            for (String key : json1.keySet()) {
+                                jsonResult.put(key, json1.get(key));
+                            }
+                            for (String key : json2.keySet()) {
+                                jsonResult.put(tableName2 + "." + key, json2.get(key));
+                            }
+                            commonList.add(jsonResult);
+                        }
+                    }
+                } else {
+                    var result = table1RowsJsons
+                            .stream()
+                            .filter(json2 -> Objects.equals(json2.get(column1), json1.get(tableName2 + "." + column2)))
+                            .toList();
+                    if (!result.isEmpty()) {
+                        for (Map<String, String> json2 : result) {
+                            Map<String, String> jsonResult = new HashMap<>();
+                            for (String key : json1.keySet()) {
+                                jsonResult.put(tableName1 + "." + key, json1.get(key));
+                            }
+                            for (String key : json2.keySet()) {
+                                jsonResult.put(key, json2.get(key));
+                            }
+                            commonList.add(jsonResult);
+                        }
+                    }
+                }
+            }
+        }
+        return commonList;
+    }
+
+    private List<Map<String, String>> firstJoin(Expression expression) throws Exception {
+        if (expression instanceof EqualsTo equalsTo) {
+            Expression leftExpression = equalsTo.getLeftExpression();
+            Expression rightExpression = equalsTo.getRightExpression();
+            String leftParameter = leftExpression.toString();
+            String rightParameter = rightExpression.toString();
+
+            String tableName1 = Arrays.stream(leftParameter.split("\\.")).toList().get(0);
+            String column1 = Arrays.stream(leftParameter.split("\\.")).toList().get(1);
+
+            String tableName2 = Arrays.stream(rightParameter.split("\\.")).toList().get(0);
+            String column2 = Arrays.stream(rightParameter.split("\\.")).toList().get(1);
+
+            Table table1 = jsonUtil.getTable(tableName1, databaseName);
+            Table table2 = jsonUtil.getTable(tableName2, databaseName);
+
+            List<Map<String, String>> commonList = new ArrayList<>();
+
+            // check if we have foreign key constraint
+            if (!hasForeignKey()) {
+                List<SelectAllResponse> table1Rows = mongoService.selectAll(databaseName, tableName1);
+                List<SelectAllResponse> table2Rows = mongoService.selectAll(databaseName, tableName2);
+                List<Map<String, String>> table1RowsJsons = table1Rows
+                        .stream()
+                        .map(s -> dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table1)))
+                        .toList();
+                List<Map<String, String>> table2RowsJsons = table2Rows
+                        .stream()
+                        .map(s -> dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table2)))
+                        .toList();
+                for (Map<String, String> json1 : table1RowsJsons) {
+                    var result = table2RowsJsons
+                            .stream()
+                            .filter(json2 -> Objects.equals(json2.get(column2), json1.get(column1)))
+                            .toList();
+                    if (!result.isEmpty()) {
+                        for (Map<String, String> json2 : result) {
+                            Map<String, String> jsonResult = new HashMap<>();
+                            for (String key : json1.keySet()) {
+                                jsonResult.put(tableName1 + "." + key, json1.get(key));
+                            }
+                            for (String key : json2.keySet()) {
+                                jsonResult.put(tableName2 + "." + key, json2.get(key));
+                            }
+                            commonList.add(jsonResult);
+                        }
+                    }
+                }
+                System.out.println("commonList " + commonList);
+            }
+            return commonList;
+        } else
+            throw new Exception("trebuie sa fie egal!");
+    }
+
+    private boolean hasForeignKey() {
+        return false;
+    }
+
     /**
-     * {"id": 1, "name": "raul", "age": 21, "dadada": "DADADA"}
+     * {"id": 1, "groupId": 1, "name": "raul", "age": 21, "dadada": "DADADA"}
+     * {"id": 1, "groupId": 1, "name": "raul", "age": 21, "dadada": "DADADA"}
+     * {"id": 1, "groupId": 1, "name": "raul", "age": 21, "dadada": "DADADA"}
+     * <p>
+     * <p>
+     * {"id": 1, "groupName": "da"}
+     * {"id": 1, "groupName": "da"}
      *
      * @param fromTableName
      * @param selectItems   [name, age]
