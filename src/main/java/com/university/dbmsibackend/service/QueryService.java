@@ -9,6 +9,6 @@ import org.springframework.stereotype.Service;
 public class QueryService {
 
     public void executeQuery(QueryRequest request) {
-        System.out.println(request.query());
+        System.out.println(request.databaseName() + ' ' + request.query());
     }
 }
