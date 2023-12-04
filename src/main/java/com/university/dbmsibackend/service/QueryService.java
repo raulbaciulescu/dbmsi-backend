@@ -52,8 +52,12 @@ public class QueryService {
             PlainSelect plainSelect = (PlainSelect) selectBody;
 
             fromTableName = plainSelect.getFromItem().toString();
-            List<SelectItem<?>> selectItem = plainSelect.getSelectItems();
-            List<Map<String, String>> result = selectSimpleQuery(fromTableName, selectItem);
+            List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
+            List<String> selectedItems = selectItems
+                    .stream()
+                    .map(SelectItem::toString)
+                    .toList();
+            List<Map<String, String>> result = selectSimpleQuery(fromTableName, selectedItems);
 
 //            // Print JOINs
 //            if (plainSelect.getJoins() != null) {
@@ -82,12 +86,13 @@ public class QueryService {
      * @param selectItems [name, age]
      * @return
      */
-    private List<Map<String, String>> selectSimpleQuery(String fromTableName, List<SelectItem<?>> selectItems) {
+    private List<Map<String, String>> selectSimpleQuery(String fromTableName, List<String> selectItems) {
         List<SelectAllResponse> rows = mongoService.selectAll("university", fromTableName);
         Table table = jsonUtil.getTable(fromTableName, "university");
         List<Map<String, String>> result = new ArrayList<>();
         for (SelectAllResponse row: rows) {
             Map<String, String> jsonRow = dictionaryToMap(TableMapper.mapKeyValueToTableRow(row.key(), row.value(), table));
+            System.out.println(jsonRow);
             Map<String, String> resultJson = new HashMap<>();
             for (String key : jsonRow.keySet()) {
                 if (selectItems.contains(key))
