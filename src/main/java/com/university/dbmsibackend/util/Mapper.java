@@ -1,9 +1,11 @@
 package com.university.dbmsibackend.util;
 
-import java.util.Dictionary;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
+import com.mongodb.client.FindIterable;
+import com.university.dbmsibackend.domain.IndexFileValue;
+import com.university.dbmsibackend.dto.SelectAllResponse;
+import org.bson.Document;
+
+import java.util.*;
 
 public class Mapper {
     public static <K, V> Map<K, V> dictionaryToMap(Dictionary<K, V> dictionary) {
@@ -18,5 +20,16 @@ public class Mapper {
         }
 
         return map;
+    }
+
+    public static List<IndexFileValue> mapToIndexFileValue(FindIterable<Document> documents) {
+        List<IndexFileValue> indexFileValues = new ArrayList<>();
+        for (Document document : documents) {
+            String primaryKeys = document.get("primary-key").toString();
+            List<String> primaryKeysList = Collections.singletonList(String.join("$", primaryKeys));
+            indexFileValues.add(new IndexFileValue(document.get("_id").toString(), primaryKeysList));
+        }
+
+        return indexFileValues;
     }
 }

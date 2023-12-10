@@ -79,7 +79,7 @@ public class QueryService {
 
             var whereExpression = plainSelect.getWhere();
             if (whereExpression != null) {
-                result = whereClauseService.handleWhereClause(result, whereExpression);
+                result = whereClauseService.handleWhereClause(result, whereExpression, databaseName);
             }
 
             // Print JOINs
