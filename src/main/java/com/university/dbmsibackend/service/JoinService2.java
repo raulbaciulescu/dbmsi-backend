@@ -15,28 +15,28 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 @Service
-public class JoinService {
+public class JoinService2 {
     private String databaseName;
     @Autowired
     private JsonUtil jsonUtil;
     @Autowired
     private MongoService mongoService;
 
-    public List<Map<String, String>> handleJoin(List<Join> joins, String databaseName) {
+    public List<Map<String, String>> handleJoin(Map<String, List<Map<String, String>>> map, List<Join> joins, String databaseName) {
         this.databaseName = databaseName;
         List<Map<String, String>> resultOfJoins = new ArrayList<>();
         for (Join join : joins) {
             Expression expression = join.getOnExpression();
             if (resultOfJoins.isEmpty())
-                resultOfJoins = firstJoin(expression);
+                resultOfJoins = firstJoin(map, expression);
             else
-                resultOfJoins = secondJoin(resultOfJoins, expression);
+                resultOfJoins = secondJoin(map, resultOfJoins, expression);
             System.out.println("Result: " + resultOfJoins);
         }
         return resultOfJoins;
     }
 
-    private List<Map<String, String>> secondJoin(List<Map<String, String>> firstJoinList, Expression expression) {
+    private List<Map<String, String>> secondJoin(Map<String, List<Map<String, String>>> map, List<Map<String, String>> firstJoinList, Expression expression) {
         List<Map<String, String>> commonList = new ArrayList<>();
         if (expression instanceof EqualsTo equalsTo) {
             Expression leftExpression = equalsTo.getLeftExpression();
@@ -55,11 +55,19 @@ public class JoinService {
 
             List<SelectAllResponse> table1Rows = mongoService.selectAll(databaseName, tableName1);
             List<SelectAllResponse> table2Rows = mongoService.selectAll(databaseName, tableName2);
-            List<Map<String, String>> table1RowsJsons = table1Rows
-                    .stream()
-                    .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table1)))
-                    .toList();
-            List<Map<String, String>> table2RowsJsons = table2Rows
+            List<Map<String, String>> table1RowsJsons;
+            List<Map<String, String>> table2RowsJsons;
+            if (map.containsKey(tableName1) && !map.get(tableName1).isEmpty())
+                table1RowsJsons = map.get(tableName1);
+            else
+                table1RowsJsons = table1Rows
+                        .stream()
+                        .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table1)))
+                        .toList();
+            if (map.containsKey(tableName2) && !map.get(tableName2).isEmpty())
+                table2RowsJsons = map.get(tableName2);
+            else
+                table2RowsJsons = table2Rows
                     .stream()
                     .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table2)))
                     .toList();
@@ -105,7 +113,7 @@ public class JoinService {
         return commonList;
     }
 
-    private List<Map<String, String>> firstJoin(Expression expression) {
+    private List<Map<String, String>> firstJoin(Map<String, List<Map<String, String>>> map, Expression expression) {
         if (expression instanceof EqualsTo equalsTo) {
             Expression leftExpression = equalsTo.getLeftExpression();
             Expression rightExpression = equalsTo.getRightExpression();
@@ -127,14 +135,24 @@ public class JoinService {
             if (!hasForeignKey()) {
                 List<SelectAllResponse> table1Rows = mongoService.selectAll(databaseName, tableName1);
                 List<SelectAllResponse> table2Rows = mongoService.selectAll(databaseName, tableName2);
-                List<Map<String, String>> table1RowsJsons = table1Rows
-                        .stream()
-                        .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table1)))
-                        .toList();
-                List<Map<String, String>> table2RowsJsons = table2Rows
-                        .stream()
-                        .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table2)))
-                        .toList();
+                List<Map<String, String>> table1RowsJsons;
+                List<Map<String, String>> table2RowsJsons;
+                if (map.containsKey(tableName1) && !map.get(tableName1).isEmpty())
+                    table1RowsJsons = map.get(tableName1);
+                else
+                    table1RowsJsons = table1Rows
+                            .stream()
+                            .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table1)))
+                            .toList();
+                if (map.containsKey(tableName2) && !map.get(tableName2).isEmpty())
+                    table2RowsJsons = map.get(tableName2);
+                else
+                    table2RowsJsons = table2Rows
+                            .stream()
+                            .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table2)))
+                            .toList();
+
+
                 for (Map<String, String> json1 : table1RowsJsons) {
                     var result = table2RowsJsons
                             .stream()

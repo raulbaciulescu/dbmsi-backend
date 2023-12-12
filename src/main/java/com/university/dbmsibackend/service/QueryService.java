@@ -1,6 +1,10 @@
 package com.university.dbmsibackend.service;
 
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import com.university.dbmsibackend.domain.Attribute;
 import com.university.dbmsibackend.domain.Table;
 import com.university.dbmsibackend.dto.QueryRequest;
@@ -15,6 +19,7 @@ import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
+import org.bson.Document;
 import org.springframework.stereotype.Service;
 
 
@@ -26,6 +31,7 @@ public class QueryService {
     private final MongoService mongoService;
     private final WhereClauseService whereClauseService;
     private final JoinService joinService;
+    private final JoinService2 joinService2;
     private final JsonUtil jsonUtil;
     private String databaseName;
 
@@ -33,12 +39,14 @@ public class QueryService {
                         MongoClient mongoClient,
                         MongoService mongoService,
                         WhereClauseService whereClauseService,
-                        JoinService joinService) {
+                        JoinService joinService,
+                        JoinService2 joinService2) {
         this.jsonUtil = jsonUtil;
         this.mongoClient = mongoClient;
         this.mongoService = mongoService;
         this.whereClauseService = whereClauseService;
         this.joinService = joinService;
+        this.joinService2 = joinService2;
         this.databaseName = "";
     }
 
@@ -66,37 +74,45 @@ public class QueryService {
 
         if (selectBody instanceof PlainSelect) {
             PlainSelect plainSelect = (PlainSelect) selectBody;
-            fromTableName = plainSelect.getFromItem().toString();
-            Table table = jsonUtil.getTable(fromTableName, databaseName);
-
-//            creare lista totala si parsare randuri
-            List<SelectAllResponse> rows = mongoService.selectAll(databaseName, fromTableName);
-            List<Map<String, Object>> result = new ArrayList<>();
-            for (SelectAllResponse row : rows) {
-                Map<String, Object> jsonRow = mapRow(row.key(), row.value(), table);
-                result.add(jsonRow);
-            }
+            Map<String, List<Dictionary<String, String>>> tableNameRowsDict = new HashMap<>();
 
             var whereExpression = plainSelect.getWhere();
             if (whereExpression != null) {
-                result = whereClauseService.handleWhereClause(result, whereExpression, databaseName);
+                tableNameRowsDict = whereClauseService.handleWhereClause(whereExpression, databaseName);
             }
-
-            // Print JOINs
+            Map<String, List<Map<String, String>>> tableNamePrimaryKeysMap = Mapper.convertMap(tableNameRowsDict);
+            System.out.println("table " + tableNamePrimaryKeysMap);
+            System.out.println("table2 " + tableNamePrimaryKeysMap);
             List<Map<String, String>> resultOfJoins = new ArrayList<>();
             if (plainSelect.getJoins() != null) {
-                resultOfJoins = joinService.handleJoin(plainSelect.getJoins(), databaseName);
+                resultOfJoins = joinService2.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
             }
+            System.out.println("result of joins: " + resultOfJoins);
 
             List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
             List<String> selectedItems = selectItems
                     .stream()
                     .map(SelectItem::toString)
                     .toList();
-            result = filterSelectFields(result, selectedItems);
+           // result = filterSelectFields(result, selectedItems);
 
-            return result;
+            return null;
         } else throw new SelectQueryException("DA");
+    }
+
+    private List<SelectAllResponse> getRowsByPrimaryKeys(Map<String, List<String>> tableNamePrimaryKeysMap) {
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        List<SelectAllResponse> response = new ArrayList<>();
+
+        for (String tableName : tableNamePrimaryKeysMap.keySet()) {
+            MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+            FindIterable<Document> documents = collection.find(Filters.in("_id", tableNamePrimaryKeysMap.get(tableName)));
+            for (Document document : documents) {
+                response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
+            }
+        }
+
+        return response;
     }
 
     private static Object convertStringToCorrectType(String type, String value) {

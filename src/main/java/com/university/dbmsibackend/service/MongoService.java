@@ -4,6 +4,7 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import com.university.dbmsibackend.dto.SelectAllResponse;
 import lombok.AllArgsConstructor;
 import org.bson.Document;
@@ -31,5 +32,17 @@ public class MongoService {
 
     public MongoDatabase getDatabase(String databaseName) {
         return mongoClient.getDatabase(databaseName);
+    }
+
+    public List<SelectAllResponse> getByPrimaryKeys(String databaseName, String tableName, List<String> primaryKeys) {
+        List<SelectAllResponse> response = new ArrayList<>();
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+        FindIterable<Document> documents = collection.find(Filters.in("_id", primaryKeys));
+        for (Document document : documents) {
+            response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
+        }
+
+        return response;
     }
 }
