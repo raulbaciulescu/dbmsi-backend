@@ -12,10 +12,7 @@ import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.exception.SelectQueryException;
 import com.university.dbmsibackend.util.JsonUtil;
 import com.university.dbmsibackend.util.Mapper;
-import com.university.dbmsibackend.util.TableMapper;
 import net.sf.jsqlparser.JSQLParserException;
-import net.sf.jsqlparser.expression.*;
-import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
@@ -31,7 +28,6 @@ public class QueryService {
     private final MongoService mongoService;
     private final WhereClauseService whereClauseService;
     private final JoinService joinService;
-    private final JoinService2 joinService2;
     private final JsonUtil jsonUtil;
     private String databaseName;
 
@@ -39,14 +35,12 @@ public class QueryService {
                         MongoClient mongoClient,
                         MongoService mongoService,
                         WhereClauseService whereClauseService,
-                        JoinService joinService,
-                        JoinService2 joinService2) {
+                        JoinService joinService) {
         this.jsonUtil = jsonUtil;
         this.mongoClient = mongoClient;
         this.mongoService = mongoService;
         this.whereClauseService = whereClauseService;
         this.joinService = joinService;
-        this.joinService2 = joinService2;
         this.databaseName = "";
     }
 
@@ -85,7 +79,7 @@ public class QueryService {
             System.out.println("table2 " + tableNamePrimaryKeysMap);
             List<Map<String, String>> resultOfJoins = new ArrayList<>();
             if (plainSelect.getJoins() != null) {
-                resultOfJoins = joinService2.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
+                resultOfJoins = joinService.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
             }
             System.out.println("result of joins: " + resultOfJoins);
 
@@ -94,9 +88,9 @@ public class QueryService {
                     .stream()
                     .map(SelectItem::toString)
                     .toList();
-           // result = filterSelectFields(result, selectedItems);
+            var result = filterSelectFields(resultOfJoins, selectedItems);
 
-            return null;
+            return result;
         } else throw new SelectQueryException("DA");
     }
 
@@ -159,9 +153,9 @@ public class QueryService {
      * @param selectItems   [name, age]
      * @return
      */
-    private List<Map<String, Object>> filterSelectFields(List<Map<String, Object>> rows, List<String> selectItems) {
+    private List<Map<String, Object>> filterSelectFields(List<Map<String, String>> rows, List<String> selectItems) {
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
+        for (Map<String, String> row : rows) {
             Map<String, Object> resultJson = new HashMap<>();
             for (String key : row.keySet()) {
                 if (selectItems.contains(key) || selectItems.contains("*"))
