@@ -27,7 +27,7 @@ public class SQLParserMain {
         System.out.println(select.getSelectItems().size());
         System.out.println(select.getSelectItems().stream().toList());
 
-        System.out.println(selectItem);
+        System.out.println("select item: " + selectItem);
 //        Assertions.assertEquals(
 //                new LongValue(1)
 //                , selectItem.getExpression());

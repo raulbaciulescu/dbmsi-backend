@@ -9,5 +9,4 @@ public class DbmsiBackendApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(DbmsiBackendApplication.class, args);
 	}
-
 }

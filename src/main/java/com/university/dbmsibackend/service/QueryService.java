@@ -64,11 +64,12 @@ public class QueryService {
     }
 
     private List<Map<String, Object>> processSelectBodyTree(Select selectBody) {
-        String fromTableName;
+
 
         if (selectBody instanceof PlainSelect) {
             PlainSelect plainSelect = (PlainSelect) selectBody;
             Map<String, List<Dictionary<String, String>>> tableNameRowsDict = new HashMap<>();
+            String fromTableName = plainSelect.getFromItem().toString();
 
             var whereExpression = plainSelect.getWhere();
             if (whereExpression != null) {
@@ -80,6 +81,8 @@ public class QueryService {
             List<Map<String, String>> resultOfJoins = new ArrayList<>();
             if (plainSelect.getJoins() != null) {
                 resultOfJoins = joinService.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
+            } else {
+                resultOfJoins = tableNamePrimaryKeysMap.get(fromTableName);
             }
             System.out.println("result of joins: " + resultOfJoins);
 

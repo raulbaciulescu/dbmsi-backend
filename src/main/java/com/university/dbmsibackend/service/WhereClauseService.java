@@ -53,6 +53,14 @@ public class WhereClauseService {
         return tableNamePrimaryKeysMap;
     }
 
+    /**
+     * Map<String, List<Dictionary<String, String>>>
+     *     key = tableName
+     *     list = rows
+     *     group.id = da AND student.id = da
+     * @param tableNamePrimaryKeysMap
+     * @param expression
+     */
     private void handleEqualsTo(Map<String, List<Dictionary<String, String>>> tableNamePrimaryKeysMap, Expression expression) {
         System.out.println("Handling EqualsTo: " + expression);
         EqualsTo equalsTo = (EqualsTo) expression;
