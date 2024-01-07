@@ -64,6 +64,13 @@ public class TableService {
 
         if (optionalDatabase.isPresent()) {
             checkIfTableIsLinkedWithOtherTables(optionalDatabase.get(), tableName);
+            dropTableFromMongo(tableName, databaseName);
+            Optional<Table> optionalTable = optionalDatabase.get().getTables()
+                    .stream()
+                    .filter(t -> Objects.equals(t.getName(), tableName))
+                    .findFirst();
+            optionalTable.ifPresent((table) -> dropIndexFiles(table, databaseName));
+
             optionalDatabase.get().setTables(
                     optionalDatabase.get().getTables()
                             .stream()
@@ -71,8 +78,15 @@ public class TableService {
                             .toList()
             );
             jsonUtil.saveCatalog(catalog);
-            dropTableFromMongo(tableName, databaseName);
         }
+    }
+
+    private void dropIndexFiles(Table table, String databaseName) {
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        table.getIndexes().forEach((index -> {
+            MongoCollection<Document> collection = database.getCollection(table.getName() + "_" + index.getName() + ".ind");
+            collection.drop();
+        }));
     }
 
     private void dropTableFromMongo(String tableName, String databaseName) {
