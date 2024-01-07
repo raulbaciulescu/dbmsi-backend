@@ -27,7 +27,7 @@ public class MongoService {
             response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
         }
 
-        return response;
+        return response.subList(0, Math.min(50, response.size()));
     }
 
     public MongoDatabase getDatabase(String databaseName) {

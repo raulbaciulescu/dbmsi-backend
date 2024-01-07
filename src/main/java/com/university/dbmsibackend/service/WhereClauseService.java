@@ -13,8 +13,8 @@ import com.university.dbmsibackend.util.Mapper;
 import com.university.dbmsibackend.util.TableMapper;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
-import net.sf.jsqlparser.expression.operators.conditional.OrExpression;
 import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
+import net.sf.jsqlparser.expression.operators.relational.GreaterThan;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -40,7 +40,7 @@ public class WhereClauseService {
     public Map<String, List<Dictionary<String, String>>> handleWhereClause(Map<String, List<Dictionary<String, String>>> tableNamePrimaryKeysMap, Expression expression) {
         switch (expression.getClass().getSimpleName()) {
             case "EqualsTo" -> handleEqualsTo(tableNamePrimaryKeysMap, expression);
-            case "GreaterThan" -> handleGreaterThan(expression);
+            case "GreaterThan" -> handleGreaterThan(tableNamePrimaryKeysMap, expression);
             case "AndExpression" -> {
                 System.out.println("Handling AND expression:");
                 AndExpression andExpression = (AndExpression) expression;
@@ -51,6 +51,73 @@ public class WhereClauseService {
         }
 
         return tableNamePrimaryKeysMap;
+    }
+
+    private void handleGreaterThan(Map<String, List<Dictionary<String, String>>> tableNamePrimaryKeysMap, Expression expression) {
+        System.out.println("Handling GreaterThan: " + expression);
+        GreaterThan equalsTo = (GreaterThan) expression;
+        Expression leftExpression = equalsTo.getLeftExpression();
+        Expression rightExpression = equalsTo.getRightExpression();
+        if (leftExpression != null && rightExpression != null) {
+            String fieldName = leftExpression.toString().split("\\.")[1];
+            String tableName = leftExpression.toString().split("\\.")[0];
+
+            List<IndexFileValue> indexFileValues = hasIndexFile(fieldName, tableName);
+            if (!indexFileValues.isEmpty()) {
+                System.out.println("am gasit index pentru " + tableName + "." + fieldName);
+                List<List<String>> listOfLists = indexFileValues
+                        .stream()
+                        //.filter(indexFileValue -> Objects.e quals(indexFileValue.value(), rightExpression.toString()))
+                        .filter(indexFileValue -> {
+                            int intValue = Integer.parseInt(indexFileValue.value());
+                            int intValueFromCondition = Integer.parseInt(rightExpression.toString());
+                            System.out.println("intValue " + intValue);
+                            System.out.println("intValueFromCondition" + intValueFromCondition);
+                            return intValue > intValueFromCondition;
+                        })
+                        .map(IndexFileValue::primaryKeys)
+                        .toList();
+                List<String> listOfPrimaryKeys = listOfLists.stream()
+                        .flatMap(List::stream)
+                        .distinct()
+                        .toList();
+                List<SelectAllResponse> newList = mongoService.getByPrimaryKeys(databaseName, tableName, listOfPrimaryKeys);
+                List<Dictionary<String, String>> newDictionaryList = TableMapper.mapKeyValueListToTableRow(newList, jsonUtil.getTable(tableName, databaseName));
+                List<Dictionary<String, String>> existingList = tableNamePrimaryKeysMap.get(tableName);
+                System.out.println(tableName + "." + fieldName + " newList " + newList);
+                System.out.println(tableName + "." + fieldName + " existing " + existingList);
+                System.out.println(tableName + "." + fieldName + " newDictionaryList " + newDictionaryList);
+                if (tableNamePrimaryKeysMap.containsKey(tableName)) {
+                    existingList = intersectLists(existingList, newDictionaryList); // intersection
+                } else {
+                    existingList = newDictionaryList;
+                }
+                System.out.println(tableName + "." + fieldName + " after intersection " + existingList);
+                tableNamePrimaryKeysMap.put(tableName, existingList);
+            } else { // we don't have an index for fieldName
+                List<SelectAllResponse> rows = mongoService.selectAll(databaseName, tableName);
+                List<Dictionary<String, String>> dictionaries = TableMapper.mapKeyValueListToTableRow(rows, jsonUtil.getTable(tableName, databaseName));
+                List<Dictionary<String, String>> filteredList = dictionaries
+                        .stream()
+                        //.filter(el -> Objects.equals(el.get(fieldName), rightExpression.toString()))
+                        .filter(el -> {
+                            int intValue = Integer.parseInt(el.get(fieldName));
+                            int intValueFromCondition = Integer.parseInt(rightExpression.toString());
+                            System.out.println("intValue " + intValue);
+                            System.out.println("intValueFromCondition" + intValueFromCondition);
+                            return intValue > intValueFromCondition;
+                        })
+                        .toList();
+                System.out.println("filtered list: " + filteredList);
+                List<Dictionary<String, String>> existingList = tableNamePrimaryKeysMap.get(tableName);
+                if (tableNamePrimaryKeysMap.containsKey(tableName)) {
+                    existingList = intersectLists(existingList, filteredList);
+                } else {
+                    existingList = filteredList;
+                }
+                tableNamePrimaryKeysMap.put(tableName, existingList);
+            }
+        }
     }
 
     /**
@@ -105,7 +172,7 @@ public class WhereClauseService {
                 System.out.println("filtered list: " + filteredList);
                 List<Dictionary<String, String>> existingList = tableNamePrimaryKeysMap.get(tableName);
                 if (tableNamePrimaryKeysMap.containsKey(tableName)) {
-                    existingList.retainAll(filteredList); // intersection
+                    existingList = intersectLists(existingList, filteredList);
                 } else {
                     existingList = filteredList;
                 }
@@ -127,10 +194,6 @@ public class WhereClauseService {
         }
 
         return result;
-    }
-
-    private void handleGreaterThan(Expression expression) {
-        System.out.println("Handling GreaterThan: " + expression);
     }
 
     private List<IndexFileValue> hasIndexFile(String fieldName, String tableName) {

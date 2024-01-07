@@ -12,6 +12,7 @@ import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.exception.SelectQueryException;
 import com.university.dbmsibackend.util.JsonUtil;
 import com.university.dbmsibackend.util.Mapper;
+import com.university.dbmsibackend.util.TableMapper;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
@@ -64,8 +65,6 @@ public class QueryService {
     }
 
     private List<Map<String, Object>> processSelectBodyTree(Select selectBody) {
-
-
         if (selectBody instanceof PlainSelect) {
             PlainSelect plainSelect = (PlainSelect) selectBody;
             Map<String, List<Dictionary<String, String>>> tableNameRowsDict = new HashMap<>();
@@ -81,8 +80,15 @@ public class QueryService {
             List<Map<String, String>> resultOfJoins = new ArrayList<>();
             if (plainSelect.getJoins() != null) {
                 resultOfJoins = joinService.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
-            } else {
+            } else if (!tableNamePrimaryKeysMap.isEmpty()) {
                 resultOfJoins = tableNamePrimaryKeysMap.get(fromTableName);
+            } else {
+                List<SelectAllResponse> resultOfJoins2 = mongoService.selectAll(databaseName, fromTableName);
+                Table table = jsonUtil.getTable(fromTableName, databaseName);
+                resultOfJoins = resultOfJoins2
+                        .stream()
+                        .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table)))
+                        .toList();
             }
             System.out.println("result of joins: " + resultOfJoins);
 
@@ -98,6 +104,21 @@ public class QueryService {
     }
 
     private List<SelectAllResponse> getRowsByPrimaryKeys(Map<String, List<String>> tableNamePrimaryKeysMap) {
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        List<SelectAllResponse> response = new ArrayList<>();
+
+        for (String tableName : tableNamePrimaryKeysMap.keySet()) {
+            MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+            FindIterable<Document> documents = collection.find(Filters.in("_id", tableNamePrimaryKeysMap.get(tableName)));
+            for (Document document : documents) {
+                response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
+            }
+        }
+
+        return response;
+    }
+
+    private List<SelectAllResponse> selectAll(Map<String, List<String>> tableNamePrimaryKeysMap) {
         MongoDatabase database = mongoClient.getDatabase(databaseName);
         List<SelectAllResponse> response = new ArrayList<>();
 

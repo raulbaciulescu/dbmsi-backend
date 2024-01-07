@@ -34,9 +34,9 @@ public class Setup implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        createTables();
+    //    createTables();
        // createIndex();
-        insertInTables();
+     //   insertInTables();
     }
 
     private void createIndex() {
