@@ -26,21 +26,20 @@ public class Setup implements CommandLineRunner {
     private ForeignKeyService foreignKeyService;
     @Autowired
     private IndexService indexService;
+    private final String databaseName = "university1";
 
     public static void main(String[] args) {
         SpringApplication.run(Setup.class, args);
     }
 
-
     @Override
     public void run(String... args) throws Exception {
-    //    createTables();
-       // createIndex();
-     //   insertInTables();
+//        createTables();
+//        createIndex();
+//        insertInTables();
     }
 
     private void createIndex() {
-        String databaseName = "db1";
         String tableName1 = "student";
 
         indexService.createIndex(new CreateIndexRequest(
@@ -55,7 +54,6 @@ public class Setup implements CommandLineRunner {
 
     private void insertInTables() {
         Random random = new Random();
-        String databaseName = "db1";
         String tableName1 = "student";
         String tableName2 = "group";
 
@@ -69,7 +67,7 @@ public class Setup implements CommandLineRunner {
                     databaseName
             ));
         }
-        for (int i = 1; i <= 2_000_000; i++) {
+        for (int i = 1; i <= 1_000_000; i++) {
             String groupIdRandom = String.valueOf(random.nextInt(50) + 1);
             String firstName = String.valueOf(random.nextInt(20) + 1);
             String value = firstName + "#lastName" + i + "#" + i + "#" + groupIdRandom;
@@ -83,7 +81,6 @@ public class Setup implements CommandLineRunner {
     }
 
     private void createTables() {
-        String databaseName = "db1";
         databaseService.createDatabase(new CreateDatabaseRequest(databaseName));
 
         String tableName2 = "group";

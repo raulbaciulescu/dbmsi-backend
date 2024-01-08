@@ -97,9 +97,9 @@ public class QueryService {
                     .stream()
                     .map(SelectItem::toString)
                     .toList();
-            var result = filterSelectFields(resultOfJoins, selectedItems);
 
-            return result;
+            boolean distinctFlag = selectBody.toString().toUpperCase().contains("DISTINCT");
+            return filterSelectFields(resultOfJoins, selectedItems, distinctFlag);
         } else throw new SelectQueryException("DA");
     }
 
@@ -174,20 +174,51 @@ public class QueryService {
      * {"id": 1, "groupName": "da"}
      * {"id": 1, "groupName": "da"}
      *
-     * @param selectItems   [name, age]
+     * @param selectItems [name, age]
      * @return
      */
-    private List<Map<String, Object>> filterSelectFields(List<Map<String, String>> rows, List<String> selectItems) {
+    private List<Map<String, Object>> filterSelectFields(List<Map<String, String>> rows, List<String> selectItems, boolean distinctFlag) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, String> row : rows) {
             Map<String, Object> resultJson = new HashMap<>();
             for (String key : row.keySet()) {
-                if (selectItems.contains(key) || selectItems.contains("*"))
-                    resultJson.put(key, row.get(key)); //{"name": "raul", "age": 21}
+                if (selectItems.contains(key) || selectItems.contains("*")) {
+                    resultJson.put(key, row.get(key)); // {"name": "raul", "age": 21}}
+                }
+
             }
-            result.add(resultJson);
+            if (distinctFlag) {
+                var theSame = result.stream()
+                        .filter(json -> areMapsEqual(json, resultJson))
+                        .toList();
+                if (theSame.isEmpty())
+                    result.add(resultJson);
+            } else
+                result.add(resultJson);
         }
 
         return result;
+    }
+
+    public static boolean areMapsEqual(Map<String, Object> map1, Map<String, Object> map2) {
+        if (map1 == null && map2 == null) {
+            return true; // Ambele hărți sunt nule, le considerăm egale
+        }
+
+        if (map1 == null || map2 == null || map1.size() != map2.size()) {
+            return false; // Dacă una este nulă sau au dimensiuni diferite, nu sunt egale
+        }
+
+        for (Map.Entry<String, Object> entry : map1.entrySet()) {
+            String key = entry.getKey();
+            Object value1 = entry.getValue();
+            Object value2 = map2.get(key);
+
+            if (!Objects.equals(value1, value2)) {
+                return false; // Valorile asociate aceleiași chei sunt diferite
+            }
+        }
+
+        return true; // Hărțile sunt egale
     }
 }
