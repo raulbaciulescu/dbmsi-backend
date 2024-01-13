@@ -128,8 +128,6 @@ public class JoinService {
                     }
                 }
             }
-            System.out.println("commonList " + commonList);
-
             return commonList;
         } else
             throw new SelectQueryException("trebuie sa fie egal!");

@@ -21,13 +21,12 @@ public class MongoService {
     public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
         MongoDatabase database = mongoClient.getDatabase(databaseName);
         MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
-        FindIterable<Document> documents = collection.find();
+        FindIterable<Document> documents = collection.find().limit(1_000_000);
         List<SelectAllResponse> response = new ArrayList<>();
         for (Document document : documents) {
             response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
         }
 
-        //return response.subList(0, Math.min(50, response.size()));
         return response;
     }
 

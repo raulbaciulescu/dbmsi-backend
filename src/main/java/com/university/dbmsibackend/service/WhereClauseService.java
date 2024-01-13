@@ -64,15 +64,12 @@ public class WhereClauseService {
 
             List<IndexFileValue> indexFileValues = hasIndexFile(fieldName, tableName);
             if (!indexFileValues.isEmpty()) {
-                System.out.println("am gasit index pentru " + tableName + "." + fieldName);
                 List<List<String>> listOfLists = indexFileValues
                         .stream()
                         //.filter(indexFileValue -> Objects.e quals(indexFileValue.value(), rightExpression.toString()))
                         .filter(indexFileValue -> {
                             int intValue = Integer.parseInt(indexFileValue.value());
                             int intValueFromCondition = Integer.parseInt(rightExpression.toString());
-                            System.out.println("intValue " + intValue);
-                            System.out.println("intValueFromCondition" + intValueFromCondition);
                             return intValue > intValueFromCondition;
                         })
                         .map(IndexFileValue::primaryKeys)
@@ -84,9 +81,6 @@ public class WhereClauseService {
                 List<SelectAllResponse> newList = mongoService.getByPrimaryKeys(databaseName, tableName, listOfPrimaryKeys);
                 List<Dictionary<String, String>> newDictionaryList = TableMapper.mapKeyValueListToTableRow(newList, jsonUtil.getTable(tableName, databaseName));
                 List<Dictionary<String, String>> existingList = tableNamePrimaryKeysMap.get(tableName);
-                System.out.println(tableName + "." + fieldName + " newList " + newList);
-                System.out.println(tableName + "." + fieldName + " existing " + existingList);
-                System.out.println(tableName + "." + fieldName + " newDictionaryList " + newDictionaryList);
                 if (tableNamePrimaryKeysMap.containsKey(tableName)) {
                     existingList = intersectLists(existingList, newDictionaryList); // intersection
                 } else {
@@ -103,12 +97,9 @@ public class WhereClauseService {
                         .filter(el -> {
                             int intValue = Integer.parseInt(el.get(fieldName));
                             int intValueFromCondition = Integer.parseInt(rightExpression.toString());
-                            System.out.println("intValue " + intValue);
-                            System.out.println("intValueFromCondition" + intValueFromCondition);
                             return intValue > intValueFromCondition;
                         })
                         .toList();
-                System.out.println("filtered list: " + filteredList);
                 List<Dictionary<String, String>> existingList = tableNamePrimaryKeysMap.get(tableName);
                 if (tableNamePrimaryKeysMap.containsKey(tableName)) {
                     existingList = intersectLists(existingList, filteredList);
@@ -139,7 +130,6 @@ public class WhereClauseService {
 
             List<IndexFileValue> indexFileValues = hasIndexFile(fieldName, tableName);
             if (!indexFileValues.isEmpty()) {
-                System.out.println("am gasit index pentru " + tableName + "." + fieldName);
                 List<List<String>> listOfLists = indexFileValues
                         .stream()
                         .filter(indexFileValue -> Objects.equals(indexFileValue.value(), rightExpression.toString()))
@@ -152,15 +142,11 @@ public class WhereClauseService {
                 List<SelectAllResponse> newList = mongoService.getByPrimaryKeys(databaseName, tableName, listOfPrimaryKeys);
                 List<Dictionary<String, String>> newDictionaryList = TableMapper.mapKeyValueListToTableRow(newList, jsonUtil.getTable(tableName, databaseName));
                 List<Dictionary<String, String>> existingList = tableNamePrimaryKeysMap.get(tableName);
-                System.out.println(tableName + "." + fieldName + " newList " + newList);
-                System.out.println(tableName + "." + fieldName + " existing " + existingList);
-                System.out.println(tableName + "." + fieldName + " newDictionaryList " + newDictionaryList);
                 if (tableNamePrimaryKeysMap.containsKey(tableName)) {
                     existingList = intersectLists(existingList, newDictionaryList); // intersection
                 } else {
                     existingList = newDictionaryList;
                 }
-                System.out.println(tableName + "." + fieldName + " after intersection " + existingList);
                 tableNamePrimaryKeysMap.put(tableName, existingList);
             } else { // we don't have an index for fieldName
                 List<SelectAllResponse> rows = mongoService.selectAll(databaseName, tableName);
@@ -169,7 +155,6 @@ public class WhereClauseService {
                         .stream()
                         .filter(el -> Objects.equals(el.get(fieldName), rightExpression.toString()))
                         .toList();
-                System.out.println("filtered list: " + filteredList);
                 List<Dictionary<String, String>> existingList = tableNamePrimaryKeysMap.get(tableName);
                 if (tableNamePrimaryKeysMap.containsKey(tableName)) {
                     existingList = intersectLists(existingList, filteredList);
