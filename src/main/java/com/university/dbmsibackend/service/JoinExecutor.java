@@ -21,20 +21,21 @@ class JoinExecutor {
     public List<Map<String, String>> executeJoin(List<Join> joins, String databaseName) {
         List<Map<String, String>> rows = new ArrayList<>();
         for (Join join : joins) {
+            String tableName1 = "", tableName2 = "", column1 = "", column2 = "";
             Expression expression = join.getOnExpression();
+            if (expression instanceof EqualsTo equalsTo) {
+                Expression leftExpression = equalsTo.getLeftExpression();
+                Expression rightExpression = equalsTo.getRightExpression();
+                String leftParameter = leftExpression.toString();
+                String rightParameter = rightExpression.toString();
+
+                tableName1 = Arrays.stream(leftParameter.split("\\.")).toList().get(0);
+                column1 = Arrays.stream(leftParameter.split("\\.")).toList().get(1);
+
+                tableName2 = Arrays.stream(rightParameter.split("\\.")).toList().get(0);
+                column2 = Arrays.stream(rightParameter.split("\\.")).toList().get(1);
+            }
             if (rows.isEmpty()) {
-
-                if (expression instanceof EqualsTo equalsTo) {
-                    Expression leftExpression = equalsTo.getLeftExpression();
-                    Expression rightExpression = equalsTo.getRightExpression();
-                    String leftParameter = leftExpression.toString();
-                    String rightParameter = rightExpression.toString();
-
-                    String tableName1 = Arrays.stream(leftParameter.split("\\.")).toList().get(0);
-                    String column1 = Arrays.stream(leftParameter.split("\\.")).toList().get(1);
-
-                    String tableName2 = Arrays.stream(rightParameter.split("\\.")).toList().get(0);
-                    String column2 = Arrays.stream(rightParameter.split("\\.")).toList().get(1);
                     rows = joinService.doJoin(
                             tableName1,
                             tableName2,
@@ -43,9 +44,16 @@ class JoinExecutor {
                             databaseName,
                             Operation.EQUALS
                     );
-                }
-            }
-            System.out.println("Result: " + rows);
+            } else
+                rows = joinService.secondJoin(
+                        rows,
+                        tableName1,
+                        tableName2,
+                        column1,
+                        column2,
+                        databaseName,
+                        Operation.EQUALS
+                );
         }
 
         return rows;

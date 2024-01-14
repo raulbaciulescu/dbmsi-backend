@@ -35,7 +35,6 @@ public class IndexNestedLoopJoinService implements JoinService {
         } else if (!hasIndex1) { // nestedLoop
             return simpleNestedLoop(tableName1, tableName2, column1, column2, databaseName, predicate);
         }
-
         List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
         List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
         List<Map<String, String>> result = new ArrayList<>();
@@ -51,6 +50,36 @@ public class IndexNestedLoopJoinService implements JoinService {
         return result;
     }
 
+    @Override
+    public List<Map<String, String>> secondJoin(List<Map<String, String>> rows, String tableName1, String tableName2,
+                                                String column1, String column2, String databaseName, Operation operation) {
+        boolean hasIndex2 = jsonUtil.hasIndex(tableName2, column2, databaseName);
+        List<Map<String, String>> result = new ArrayList<>();
+        Table table2 = jsonUtil.getTable(tableName2, databaseName);
+
+        if (hasIndex2) {
+            List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
+            for (Map<String, String> map1 : rows) {
+                for (IndexFileValue indexFileValue : table2IndexValues) {
+                    if (compare(operation, indexFileValue.value(), map1.get(tableName1 + "." + column1))) {
+                        result.addAll(joinUtil.mergeMapWithPrimaryKeys(map1, indexFileValue.primaryKeys(), tableName1, table2, databaseName));
+                    }
+                }
+            }
+        } else {
+            List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
+            for (Map<String, String> map1 : rows) {
+                for (Map<String, String> map2 : table2RowsJsons) {
+                    if (compare(operation, map2.get(column2), map1.get(tableName1 + "." + column1))) {
+                        result.add(joinUtil.mergeMaps(map1, map2, tableName1, tableName2));
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
     private List<Map<String, String>> simpleNestedLoop(String tableName1, String tableName2, String column1, String column2, String databaseName, Operation predicate) {
         List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
         List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
@@ -59,7 +88,7 @@ public class IndexNestedLoopJoinService implements JoinService {
         for (Map<String, String> map1 : table1RowsJsons) {
             for (Map<String, String> map2 : table2RowsJsons) {
                 if (compare(predicate, map2.get(column2), map1.get(column1))) {
-                    result.add(mergeMaps(map1, map2, tableName1, tableName2));
+                    result.add(joinUtil.mergeMaps(map1, map2, tableName1, tableName2));
                 }
             }
         }
@@ -67,17 +96,7 @@ public class IndexNestedLoopJoinService implements JoinService {
         return result;
     }
 
-    private Map<String, String> mergeMaps(Map<String, String> map1, Map<String, String> map2, String tableName1, String tableName2) {
-        Map<String, String> commmonMap = new HashMap<>();
-        for (String key : map1.keySet()) {
-            commmonMap.put(tableName1 + "." + key, map1.get(key));
-        }
-        for (String key : map2.keySet()) {
-            commmonMap.put(tableName2 + "." + key, map2.get(key));
-        }
 
-        return commmonMap;
-    }
 
     private boolean compare(Operation predicate, String value, String s) {
         return Objects.equals(value, s);

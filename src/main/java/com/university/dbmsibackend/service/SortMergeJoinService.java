@@ -39,7 +39,6 @@ public class SortMergeJoinService implements JoinService {
         List<Map<String, String>> result = new ArrayList<>();
         Table table2 = jsonUtil.getTable(tableName2, databaseName);
 
-
         String finalColumn1 = column1;
         Comparator<Map<String, String>> mapComparator = (m1, m2) -> {
             Integer i1 = Integer.parseInt(m1.get(finalColumn1));
@@ -68,6 +67,84 @@ public class SortMergeJoinService implements JoinService {
                 mark = -1;
             }
         } while (r < table1RowsJsons.size() && s < table2IndexValues.size());
+
+        return result;
+    }
+
+    @Override
+    public List<Map<String, String>> secondJoin(List<Map<String, String>> rows, String tableName1, String tableName2,
+                                                String column1, String column2, String databaseName, Operation predicate) {
+        boolean hasIndex2 = jsonUtil.hasIndex(tableName2, column2, databaseName);
+        List<Map<String, String>> result = new ArrayList<>();
+        Table table2 = jsonUtil.getTable(tableName2, databaseName);
+
+        if (hasIndex2) {
+            List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
+
+            String finalColumn1 = tableName1 + "." + column1;
+            Comparator<Map<String, String>> mapComparator = (m1, m2) -> {
+                Integer i1 = Integer.parseInt(m1.get(finalColumn1));
+                Integer i2 = Integer.parseInt(m2.get(finalColumn1));
+                return i1.compareTo(i2);
+            };
+            rows.sort(mapComparator);
+            table2IndexValues = table2IndexValues.stream()
+                    .sorted(Comparator.comparing(indexFileValue -> Integer.parseInt(indexFileValue.value())))
+                    .toList();
+
+            int mark = -1, r = 0, s = 0;
+            do {
+                if (mark == -1) {
+                    while (r < rows.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2IndexValues.get(s).value()) < 0)
+                        r++;
+                    while (s < table2IndexValues.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2IndexValues.get(s).value()) > 0)
+                        s++;
+                    mark = s;
+                }
+                if (compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2IndexValues.get(s).value()) == 0) {
+                    result.addAll(joinUtil.mergeMapWithPrimaryKeys(rows.get(r), table2IndexValues.get(s).primaryKeys(), tableName1, table2, databaseName));
+                    s++;
+                } else {
+                    s = mark;
+                    r++;
+                    mark = -1;
+                }
+            } while (r < rows.size() && s < table2IndexValues.size());
+        } else {
+            List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
+            Comparator<Map<String, String>> mapComparator2 = (m1, m2) -> {
+                Integer i1 = Integer.parseInt(m1.get(column2));
+                Integer i2 = Integer.parseInt(m2.get(column2));
+                return i1.compareTo(i2);
+            };
+            String finalColumn1 = tableName1 + "." + column1;
+            Comparator<Map<String, String>> mapComparator = (m1, m2) -> {
+                Integer i1 = Integer.parseInt(m1.get(finalColumn1));
+                Integer i2 = Integer.parseInt(m2.get(finalColumn1));
+                return i1.compareTo(i2);
+            };
+            rows.sort(mapComparator);
+            table2RowsJsons.sort(mapComparator2);
+            int mark = -1, r = 0, s = 0;
+            do {
+                if (mark == -1) {
+                    while (r < rows.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2RowsJsons.get(s).get(column2)) < 0)
+                        r++;
+                    while (s < table2RowsJsons.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2RowsJsons.get(s).get(column2)) > 0)
+                        s++;
+                    mark = s;
+                }
+                if (r < rows.size() && s < table2RowsJsons.size() &&
+                        compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2RowsJsons.get(s).get(column2)) == 0) {
+                    result.add(joinUtil.mergeMaps(rows.get(r), table2RowsJsons.get(s), tableName1, tableName2));
+                    s++;
+                } else {
+                    s = mark;
+                    r++;
+                    mark = -1;
+                }
+            } while (r < rows.size() && s < table2RowsJsons.size());
+        }
 
         return result;
     }
@@ -104,7 +181,7 @@ public class SortMergeJoinService implements JoinService {
             }
             if (r < table1RowsJsons.size() && s < table2RowsJsons.size() &&
                     compare(predicate, table1RowsJsons.get(r).get(column1), table2RowsJsons.get(s).get(column2)) == 0) {
-                result.add(mergeMaps(table1RowsJsons.get(r), table2RowsJsons.get(s), tableName1, tableName2));
+                result.add(joinUtil.mergeMaps(table1RowsJsons.get(r), table2RowsJsons.get(s), tableName1, tableName2));
                 s++;
             } else {
                 s = mark;
@@ -115,17 +192,4 @@ public class SortMergeJoinService implements JoinService {
 
         return result;
     }
-
-    private Map<String, String> mergeMaps(Map<String, String> map1, Map<String, String> map2, String tableName1, String tableName2) {
-        Map<String, String> commmonMap = new HashMap<>();
-        for (String key : map1.keySet()) {
-            commmonMap.put(tableName1 + "." + key, map1.get(key));
-        }
-        for (String key : map2.keySet()) {
-            commmonMap.put(tableName2 + "." + key, map2.get(key));
-        }
-
-        return commmonMap;
-    }
-
 }

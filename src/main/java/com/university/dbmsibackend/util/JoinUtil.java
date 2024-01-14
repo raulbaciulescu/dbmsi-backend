@@ -31,4 +31,16 @@ public class JoinUtil {
 
         return result;
     }
+
+    public Map<String, String> mergeMaps(Map<String, String> map1, Map<String, String> map2, String tableName1, String tableName2) {
+        Map<String, String> commmonMap = new HashMap<>();
+        for (String key : map1.keySet()) {
+            commmonMap.put(tableName1 + "." + key, map1.get(key));
+        }
+        for (String key : map2.keySet()) {
+            commmonMap.put(tableName2 + "." + key, map2.get(key));
+        }
+
+        return commmonMap;
+    }
 }
