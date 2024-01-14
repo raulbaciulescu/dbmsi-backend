@@ -59,16 +59,10 @@ public class WhereClauseService2 {
         Expression leftExpression = equalsTo.getLeftExpression();
         Expression rightExpression = equalsTo.getRightExpression();
         if (leftExpression != null && rightExpression != null) {
-            String fieldName = leftExpression.toString().split("\\.")[1];
-            String tableName = leftExpression.toString().split("\\.")[0];
-
             rows = rows.stream()
                     .filter(map -> {
                         int intValue = Integer.parseInt(map.get(leftExpression.toString()));
                         int intValueFromCondition = Integer.parseInt(rightExpression.toString());
-
-                        System.out.println("int1: " + intValue);
-                        System.out.println("int2 " + intValueFromCondition);
                         return intValue > intValueFromCondition;
                     })
                     .collect(Collectors.toList());

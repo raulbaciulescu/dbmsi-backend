@@ -33,19 +33,22 @@ public class QueryService2 {
     private final IndexNestedLoopJoinService indexNestedLoopJoinService;
     private final JsonUtil jsonUtil;
     private String databaseName;
+    private JoinExecutor joinExecutor;
 
     public QueryService2(JsonUtil jsonUtil,
                          MongoClient mongoClient,
                          MongoService mongoService,
                          WhereClauseService2 whereClauseService,
                          IndexNestedLoopJoinService indexNestedLoopJoinService,
-                         JoinServiceTemp joinServiceTemp) {
+                         JoinServiceTemp joinServiceTemp,
+                         JoinExecutor joinExecutor) {
         this.jsonUtil = jsonUtil;
         this.mongoClient = mongoClient;
         this.mongoService = mongoService;
         this.whereClauseService = whereClauseService;
         this.joinServiceTemp = joinServiceTemp;
         this.indexNestedLoopJoinService = indexNestedLoopJoinService;
+        this.joinExecutor = joinExecutor;
         this.databaseName = "";
     }
 
@@ -106,11 +109,11 @@ public class QueryService2 {
 
         List<Map<String, String>> rows;
         if (plainSelect.getJoins() != null) {
-            rows = indexNestedLoopJoinService.doJoin(plainSelect.getJoins(), databaseName);
+            rows = joinExecutor.executeJoin(plainSelect.getJoins(), databaseName);
         } else {
-            List<SelectAllResponse> resultOfJoins2 = mongoService.selectAll(databaseName, fromTableName);
+            List<SelectAllResponse> allRows = mongoService.selectAll(databaseName, fromTableName);
             Table table = jsonUtil.getTable(fromTableName, databaseName);
-            rows = resultOfJoins2
+            rows = allRows
                     .stream()
                     .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table)))
                     .toList();
