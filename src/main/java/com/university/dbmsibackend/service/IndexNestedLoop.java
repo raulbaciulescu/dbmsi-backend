@@ -78,9 +78,9 @@ public class IndexNestedLoop {
         List<Map<String, String>> table1RowsJsons = getTableJsonList(tableName1, databaseName);
         List<Map<String, String>> table2RowsJsons = getTableJsonList(tableName2, databaseName);
         List<Map<String, String>> result = new ArrayList<>();
-        Table table2 = jsonUtil.getTable(tableName2, databaseName);
+
         for (Map<String, String> map1 : table1RowsJsons) {
-            for (Map<String, String> map2 : table1RowsJsons) {
+            for (Map<String, String> map2 : table2RowsJsons) {
                 if (compare(predicate, map2.get(column2), map1.get(column1))) {
                     result.add(mergeMaps(map1, map2, tableName1, tableName2));
                 }
