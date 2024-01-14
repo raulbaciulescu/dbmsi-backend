@@ -55,7 +55,7 @@ public class JoinService {
 
             for (Map<String, String> json1 : firstJoinList) {
                 if (json1.containsKey(tableName1 + "." + column1)) {
-                    var result = table2RowsJsons
+                    List<Map<String, String>> result = table2RowsJsons
                             .stream()
                             .filter(json2 -> Objects.equals(json2.get(column2), json1.get(tableName1 + "." + column1)))
                             .toList();

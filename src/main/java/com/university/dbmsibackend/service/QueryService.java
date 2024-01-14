@@ -75,9 +75,7 @@ public class QueryService {
                 tableNameRowsDict = whereClauseService.handleWhereClause(whereExpression, databaseName);
             }
             Map<String, List<Map<String, String>>> tableNamePrimaryKeysMap = Mapper.convertMap(tableNameRowsDict);
-            System.out.println("table " + tableNamePrimaryKeysMap);
-            System.out.println("table2 " + tableNamePrimaryKeysMap);
-            List<Map<String, String>> resultOfJoins = new ArrayList<>();
+            List<Map<String, String>> resultOfJoins;
             if (plainSelect.getJoins() != null) {
                 resultOfJoins = joinService.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
             } else if (!tableNamePrimaryKeysMap.isEmpty()) {
@@ -90,7 +88,6 @@ public class QueryService {
                         .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table)))
                         .toList();
             }
-            System.out.println("result of joins: " + resultOfJoins);
 
             List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
             List<String> selectedItems = selectItems
@@ -100,7 +97,7 @@ public class QueryService {
 
             boolean distinctFlag = selectBody.toString().toUpperCase().contains("DISTINCT");
             return filterSelectFields(resultOfJoins, selectedItems, distinctFlag);
-        } else throw new SelectQueryException("DA");
+        } else throw new SelectQueryException("Something went wrong!");
     }
 
     private List<SelectAllResponse> getRowsByPrimaryKeys(Map<String, List<String>> tableNamePrimaryKeysMap) {
