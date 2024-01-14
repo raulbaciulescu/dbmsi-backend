@@ -29,8 +29,8 @@ public class QueryService2 {
     private final MongoClient mongoClient;
     private final MongoService mongoService;
     private final WhereClauseService2 whereClauseService;
-    private final JoinService joinService;
-    private final IndexNestedLoop indexNestedLoop;
+    private final JoinServiceTemp joinServiceTemp;
+    private final IndexNestedLoopJoinService indexNestedLoopJoinService;
     private final JsonUtil jsonUtil;
     private String databaseName;
 
@@ -38,18 +38,18 @@ public class QueryService2 {
                          MongoClient mongoClient,
                          MongoService mongoService,
                          WhereClauseService2 whereClauseService,
-                         IndexNestedLoop indexNestedLoop,
-                         JoinService joinService) {
+                         IndexNestedLoopJoinService indexNestedLoopJoinService,
+                         JoinServiceTemp joinServiceTemp) {
         this.jsonUtil = jsonUtil;
         this.mongoClient = mongoClient;
         this.mongoService = mongoService;
         this.whereClauseService = whereClauseService;
-        this.joinService = joinService;
-        this.indexNestedLoop = indexNestedLoop;
+        this.joinServiceTemp = joinServiceTemp;
+        this.indexNestedLoopJoinService = indexNestedLoopJoinService;
         this.databaseName = "";
     }
 
-    public List<Map<String, Object>> executeQuery(QueryRequest request) {
+    public List<Map<String, String>> executeQuery(QueryRequest request) {
         String query = request.query();
         databaseName = request.databaseName();
         try {
@@ -60,7 +60,7 @@ public class QueryService2 {
         }
     }
 
-    private List<Map<String, Object>> processSqlTree(Statement statement) {
+    private List<Map<String, String>> processSqlTree(Statement statement) {
         if (statement instanceof Select select) {
             Select selectBody = select.getSelectBody();
             return processSelectBodyTree(selectBody);
@@ -68,39 +68,55 @@ public class QueryService2 {
             throw new SelectQueryException("Not a SELECT statement.");
     }
 
-    private List<Map<String, Object>> processSelectBodyTree(Select selectBody) {
+    private List<Map<String, String>> processSelectBodyTree(Select selectBody) {
         if (selectBody instanceof PlainSelect) {
             PlainSelect plainSelect = (PlainSelect) selectBody;
             List<Map<String, String>> rows = new ArrayList<>();
-            String fromTableName = plainSelect.getFromItem().toString();
 
-//            if (plainSelect.getJoins() != null) {
-//                rows = indexNestedLoop.doJoin(rows, plainSelect.getJoins(), databaseName);
-//            } else if (!rows.isEmpty()) {
-//                rows = rows.get(fromTableName);
-//            } else {
-//                List<SelectAllResponse> resultOfJoins2 = mongoService.selectAll(databaseName, fromTableName);
-//                Table table = jsonUtil.getTable(fromTableName, databaseName);
-//                rows = resultOfJoins2
-//                        .stream()
-//                        .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table)))
-//                        .toList();
-//            }
-//
-//            var whereExpression = plainSelect.getWhere();
-//            if (whereExpression != null) {
-//                rows = whereClauseService.handleWhereClause(rows, whereExpression, databaseName);
-//            }
+            rows = handleJoin(plainSelect);
+            rows = handleWhere(plainSelect, rows);
+            rows = filterRows(selectBody, rows);
 
-            List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
-            List<String> selectedItems = selectItems
-                    .stream()
-                    .map(SelectItem::toString)
-                    .toList();
-
-            boolean distinctFlag = selectBody.toString().toUpperCase().contains("DISTINCT");
-            return filterSelectFields(rows, selectedItems, distinctFlag);
+            return rows;
         } else throw new SelectQueryException("Something went wrong!");
+    }
+
+    private List<Map<String, String>> filterRows(Select selectBody, List<Map<String, String>> rows) {
+        PlainSelect plainSelect = (PlainSelect) selectBody;
+        List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
+        List<String> selectedItems = selectItems
+                .stream()
+                .map(SelectItem::toString)
+                .toList();
+        boolean distinctFlag = selectBody.toString().toUpperCase().contains("DISTINCT");
+        return filterSelectFields(rows, selectedItems, distinctFlag);
+    }
+
+    private List<Map<String, String>> handleWhere(PlainSelect plainSelect, List<Map<String, String>> rows) {
+        var whereExpression = plainSelect.getWhere();
+        if (whereExpression != null) {
+            rows = whereClauseService.handleWhereClause(whereExpression, databaseName, rows);
+        }
+
+        return rows;
+    }
+
+    private List<Map<String, String>> handleJoin(PlainSelect plainSelect) {
+        String fromTableName = plainSelect.getFromItem().toString();
+
+        List<Map<String, String>> rows;
+        if (plainSelect.getJoins() != null) {
+            rows = indexNestedLoopJoinService.doJoin(plainSelect.getJoins(), databaseName);
+        } else {
+            List<SelectAllResponse> resultOfJoins2 = mongoService.selectAll(databaseName, fromTableName);
+            Table table = jsonUtil.getTable(fromTableName, databaseName);
+            rows = resultOfJoins2
+                    .stream()
+                    .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table)))
+                    .toList();
+        }
+
+        return rows;
     }
 
     private List<SelectAllResponse> getRowsByPrimaryKeys(Map<String, List<String>> tableNamePrimaryKeysMap) {
@@ -177,10 +193,10 @@ public class QueryService2 {
      * @param selectItems [name, age]
      * @return
      */
-    private List<Map<String, Object>> filterSelectFields(List<Map<String, String>> rows, List<String> selectItems, boolean distinctFlag) {
-        List<Map<String, Object>> result = new ArrayList<>();
+    private List<Map<String, String>> filterSelectFields(List<Map<String, String>> rows, List<String> selectItems, boolean distinctFlag) {
+        List<Map<String, String>> result = new ArrayList<>();
         for (Map<String, String> row : rows) {
-            Map<String, Object> resultJson = new HashMap<>();
+            Map<String, String> resultJson = new HashMap<>();
             for (String key : row.keySet()) {
                 if (selectItems.contains(key) || selectItems.contains("*")) {
                     resultJson.put(key, row.get(key)); // {"name": "raul", "age": 21}}
@@ -200,7 +216,7 @@ public class QueryService2 {
         return result;
     }
 
-    public static boolean areMapsEqual(Map<String, Object> map1, Map<String, Object> map2) {
+    public static boolean areMapsEqual(Map<String, String> map1, Map<String, String> map2) {
         if (map1 == null && map2 == null) {
             return true; // Ambele hărți sunt nule, le considerăm egale
         }
@@ -209,7 +225,7 @@ public class QueryService2 {
             return false; // Dacă una este nulă sau au dimensiuni diferite, nu sunt egale
         }
 
-        for (Map.Entry<String, Object> entry : map1.entrySet()) {
+        for (Map.Entry<String, String> entry : map1.entrySet()) {
             String key = entry.getKey();
             Object value1 = entry.getValue();
             Object value2 = map2.get(key);

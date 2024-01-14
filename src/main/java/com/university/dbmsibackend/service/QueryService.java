@@ -28,7 +28,7 @@ public class QueryService {
     private final MongoClient mongoClient;
     private final MongoService mongoService;
     private final WhereClauseService whereClauseService;
-    private final JoinService joinService;
+    private final JoinServiceTemp joinServiceTemp;
     private final JsonUtil jsonUtil;
     private String databaseName;
 
@@ -36,12 +36,12 @@ public class QueryService {
                         MongoClient mongoClient,
                         MongoService mongoService,
                         WhereClauseService whereClauseService,
-                        JoinService joinService) {
+                        JoinServiceTemp joinServiceTemp) {
         this.jsonUtil = jsonUtil;
         this.mongoClient = mongoClient;
         this.mongoService = mongoService;
         this.whereClauseService = whereClauseService;
-        this.joinService = joinService;
+        this.joinServiceTemp = joinServiceTemp;
         this.databaseName = "";
     }
 
@@ -77,7 +77,7 @@ public class QueryService {
             Map<String, List<Map<String, String>>> tableNamePrimaryKeysMap = Mapper.convertMap(tableNameRowsDict);
             List<Map<String, String>> resultOfJoins;
             if (plainSelect.getJoins() != null) {
-                resultOfJoins = joinService.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
+                resultOfJoins = joinServiceTemp.handleJoin(tableNamePrimaryKeysMap, plainSelect.getJoins(), databaseName);
             } else if (!tableNamePrimaryKeysMap.isEmpty()) {
                 resultOfJoins = tableNamePrimaryKeysMap.get(fromTableName);
             } else {

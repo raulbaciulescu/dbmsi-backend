@@ -1,13 +1,8 @@
 package com.university.dbmsibackend.service;
 
 import com.university.dbmsibackend.domain.Operation;
-import net.sf.jsqlparser.expression.Expression;
-import net.sf.jsqlparser.expression.WhenClause;
-import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
-import net.sf.jsqlparser.statement.select.Join;
-import net.sf.jsqlparser.statement.select.OrderByElement;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import org.junit.jupiter.api.Test;
@@ -15,21 +10,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource("classpath:application-test.properties")
 class JoinTest {
     @Autowired
-    private IndexNestedLoop indexNestedLoop;
+    private IndexNestedLoopJoinService indexNestedLoopJoinService;
     @Autowired
-    private SortMergeJoin sortMergeJoin;
+    private SortMergeJoinService sortMergeJoinService;
     @Autowired
     private WhereClauseService2 whereClauseService;
 
@@ -42,7 +34,7 @@ class JoinTest {
         String databaseName = "university4";
         Operation predicate = Operation.EQUALS;
 
-        var result = indexNestedLoop.doJoin(
+        var result = indexNestedLoopJoinService.doJoin(
                 tableName1,
                 tableName2,
                 column1,
@@ -51,7 +43,7 @@ class JoinTest {
                 predicate
         );
         System.out.println(result);
-        var result2 = sortMergeJoin.doJoin(
+        var result2 = sortMergeJoinService.doJoin(
                 tableName1,
                 tableName2,
                 column1,

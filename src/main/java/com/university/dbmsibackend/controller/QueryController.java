@@ -2,6 +2,7 @@ package com.university.dbmsibackend.controller;
 
 import com.university.dbmsibackend.dto.QueryRequest;
 import com.university.dbmsibackend.service.QueryService;
+import com.university.dbmsibackend.service.QueryService2;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -14,11 +15,11 @@ import java.util.Map;
 @RequestMapping(("/sqlCommand"))
 @CrossOrigin(origins = "http://localhost:3000")
 public class QueryController {
-    private QueryService service;
+    private QueryService2 service;
     
     @PostMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<Map<String, Object>> query(@RequestBody QueryRequest request){
+    public List<Map<String, String>> query(@RequestBody QueryRequest request){
         return service.executeQuery(request);
     }
 

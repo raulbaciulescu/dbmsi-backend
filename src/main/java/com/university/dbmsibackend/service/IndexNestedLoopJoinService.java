@@ -3,9 +3,13 @@ package com.university.dbmsibackend.service;
 import com.university.dbmsibackend.domain.IndexFileValue;
 import com.university.dbmsibackend.domain.Operation;
 import com.university.dbmsibackend.domain.Table;
+import com.university.dbmsibackend.service.api.JoinService;
 import com.university.dbmsibackend.util.JoinUtil;
 import com.university.dbmsibackend.util.JsonUtil;
 import lombok.AllArgsConstructor;
+import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
+import net.sf.jsqlparser.statement.select.Join;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -13,11 +17,12 @@ import java.util.*;
 
 @Service
 @AllArgsConstructor
-public class IndexNestedLoop {
+public class IndexNestedLoopJoinService implements JoinService {
     private JsonUtil jsonUtil;
     private MongoService mongoService;
     private JoinUtil joinUtil;
 
+    @Override
     public List<Map<String, String>> doJoin(String tableName1, String tableName2, String column1, String column2, String databaseName, Operation predicate) {
         boolean hasIndex1 = jsonUtil.hasIndex(tableName1, column1, databaseName);
         boolean hasIndex2 = jsonUtil.hasIndex(tableName2, column2, databaseName);
@@ -78,5 +83,37 @@ public class IndexNestedLoop {
 
     private boolean compare(Operation predicate, String value, String s) {
         return Objects.equals(value, s);
+    }
+
+    public List<Map<String, String>> doJoin(List<Join> joins, String databaseName) {
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (Join join : joins) {
+            Expression expression = join.getOnExpression();
+            if (rows.isEmpty()) {
+
+                if (expression instanceof EqualsTo equalsTo) {
+                    Expression leftExpression = equalsTo.getLeftExpression();
+                    Expression rightExpression = equalsTo.getRightExpression();
+                    String leftParameter = leftExpression.toString();
+                    String rightParameter = rightExpression.toString();
+
+                    String tableName1 = Arrays.stream(leftParameter.split("\\.")).toList().get(0);
+                    String column1 = Arrays.stream(leftParameter.split("\\.")).toList().get(1);
+
+                    String tableName2 = Arrays.stream(rightParameter.split("\\.")).toList().get(0);
+                    String column2 = Arrays.stream(rightParameter.split("\\.")).toList().get(1);
+                    rows = doJoin(
+                            tableName1,
+                            tableName2,
+                            column1,
+                            column2,
+                            databaseName,
+                            Operation.EQUALS
+                    );
+                }
+            }
+            System.out.println("Result: " + rows);
+        }
+        return rows;
     }
 }

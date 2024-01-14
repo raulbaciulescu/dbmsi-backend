@@ -3,6 +3,7 @@ package com.university.dbmsibackend.service;
 import com.university.dbmsibackend.domain.IndexFileValue;
 import com.university.dbmsibackend.domain.Operation;
 import com.university.dbmsibackend.domain.Table;
+import com.university.dbmsibackend.service.api.JoinService;
 import com.university.dbmsibackend.util.JoinUtil;
 import com.university.dbmsibackend.util.JsonUtil;
 import lombok.AllArgsConstructor;
@@ -15,11 +16,12 @@ import java.util.Map;
 
 @Service
 @AllArgsConstructor
-public class SortMergeJoin {
+public class SortMergeJoinService implements JoinService {
     private JsonUtil jsonUtil;
     private MongoService mongoService;
     private JoinUtil joinUtil;
 
+    @Override
     public List<Map<String, String>> doJoin(String tableName1, String tableName2, String column1, String column2, String databaseName, Operation predicate) {
         boolean hasIndex1 = jsonUtil.hasIndex(tableName1, column1, databaseName);
         boolean hasIndex2 = jsonUtil.hasIndex(tableName2, column2, databaseName);

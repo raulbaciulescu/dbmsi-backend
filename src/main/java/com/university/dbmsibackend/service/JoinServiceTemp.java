@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 @Service
-public class JoinService {
+public class JoinServiceTemp {
     private String databaseName;
     @Autowired
     private JsonUtil jsonUtil;
