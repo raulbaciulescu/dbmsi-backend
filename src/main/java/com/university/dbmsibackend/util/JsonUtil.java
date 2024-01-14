@@ -2,15 +2,14 @@ package com.university.dbmsibackend.util;
 
 import com.google.gson.Gson;
 import com.google.gson.stream.JsonReader;
-import com.university.dbmsibackend.domain.Catalog;
-import com.university.dbmsibackend.domain.Database;
-import com.university.dbmsibackend.domain.Table;
+import com.university.dbmsibackend.domain.*;
 import com.university.dbmsibackend.exception.EntityNotFoundException;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -55,5 +54,18 @@ public class JsonUtil {
                 return optionalTable.get();
             else throw new EntityNotFoundException("Table doesn't exist!");
         } else throw new EntityNotFoundException("Database doesn't exist!");
+    }
+
+    public boolean hasIndex(String tableName, String column, String databaseName) {
+        Table table = getTable(tableName, databaseName);
+        List<Index> indexes = table.getIndexes();
+        for (Index index : indexes) {
+            List<String> attributeNames = index.getAttributes().stream().map(Attribute::getName).toList();
+            if (attributeNames.contains(column)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

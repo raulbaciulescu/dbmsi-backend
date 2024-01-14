@@ -5,8 +5,13 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.university.dbmsibackend.domain.Attribute;
+import com.university.dbmsibackend.domain.Index;
+import com.university.dbmsibackend.domain.IndexFileValue;
 import com.university.dbmsibackend.domain.Table;
 import com.university.dbmsibackend.dto.SelectAllResponse;
+import com.university.dbmsibackend.util.JsonUtil;
+import com.university.dbmsibackend.util.Mapper;
 import com.university.dbmsibackend.util.TableMapper;
 import lombok.AllArgsConstructor;
 import org.bson.Document;
@@ -16,11 +21,13 @@ import java.util.ArrayList;
 import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
 public class MongoService {
     private MongoClient mongoClient;
+    private JsonUtil jsonUtil;
 
     public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
         MongoDatabase database = mongoClient.getDatabase(databaseName);
@@ -32,6 +39,37 @@ public class MongoService {
         }
 
         return response;
+    }
+
+    public List<Map<String, String>> getTableJsonList(String tableName, String databaseName) {
+        Table table1 = jsonUtil.getTable(tableName, databaseName);
+        List<SelectAllResponse> table1Rows;
+        List<Map<String, String>> tableRowsJsons;
+
+        table1Rows = selectAll(databaseName, tableName);
+        tableRowsJsons = table1Rows
+                .stream()
+                .map(s -> Mapper.dictionaryToMap(TableMapper.mapKeyValueToTableRow(s.key(), s.value(), table1)))
+                .collect(Collectors.toList());
+
+        return tableRowsJsons;
+    }
+
+    public List<IndexFileValue> getIndexValues(String tableName, String column, String databaseName) {
+        List<IndexFileValue> indexFileValues = new ArrayList<>();
+        Table table = jsonUtil.getTable(tableName, databaseName);
+        List<Index> indexes = table.getIndexes();
+        for (Index index : indexes) {
+            List<String> attributeNames = index.getAttributes().stream().map(Attribute::getName).toList();
+            if (attributeNames.contains(column)) {
+                MongoDatabase database = getDatabase(databaseName);
+                MongoCollection<Document> collection = database.getCollection(tableName + "_" + index.getName() + ".ind");
+                FindIterable<Document> documents = collection.find();
+                indexFileValues = Mapper.mapToIndexFileValue(documents);
+            }
+        }
+
+        return indexFileValues;
     }
 
     public MongoDatabase getDatabase(String databaseName) {
