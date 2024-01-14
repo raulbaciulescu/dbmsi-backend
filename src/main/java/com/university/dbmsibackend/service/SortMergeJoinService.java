@@ -9,10 +9,7 @@ import com.university.dbmsibackend.util.JsonUtil;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @AllArgsConstructor
@@ -44,12 +41,10 @@ public class SortMergeJoinService implements JoinService {
 
 
         String finalColumn1 = column1;
-        Comparator<Map<String, String>> mapComparator = new Comparator<Map<String, String>>() {
-            public int compare(Map<String, String> m1, Map<String, String> m2) {
-                Integer i1 = Integer.parseInt(m1.get(finalColumn1));
-                Integer i2 = Integer.parseInt(m2.get(finalColumn1));
-                return i1.compareTo(i2);
-            }
+        Comparator<Map<String, String>> mapComparator = (m1, m2) -> {
+            Integer i1 = Integer.parseInt(m1.get(finalColumn1));
+            Integer i2 = Integer.parseInt(m2.get(finalColumn1));
+            return i1.compareTo(i2);
         };
         table1RowsJsons.sort(mapComparator);
         table2IndexValues = table2IndexValues.stream()
@@ -82,6 +77,55 @@ public class SortMergeJoinService implements JoinService {
     }
 
     private List<Map<String, String>> sortMergeJoinWithoutIndex(String tableName1, String tableName2, String column1, String column2, String databaseName, Operation predicate) {
-        return null;
+        List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
+        List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
+        List<Map<String, String>> result = new ArrayList<>();
+        Comparator<Map<String, String>> mapComparator = (m1, m2) -> {
+            Integer i1 = Integer.parseInt(m1.get(column1));
+            Integer i2 = Integer.parseInt(m2.get(column1));
+            return i1.compareTo(i2);
+        };
+        Comparator<Map<String, String>> mapComparator2 = (m1, m2) -> {
+            Integer i1 = Integer.parseInt(m1.get(column2));
+            Integer i2 = Integer.parseInt(m2.get(column2));
+            return i1.compareTo(i2);
+        };
+
+        table1RowsJsons.sort(mapComparator);
+        table2RowsJsons.sort(mapComparator2);
+        int mark = -1, r = 0, s = 0;
+        do {
+            if (mark == -1) {
+                while (r < table1RowsJsons.size() && compare(predicate, table1RowsJsons.get(r).get(column1), table2RowsJsons.get(s).get(column2)) < 0)
+                    r++;
+                while (s < table2RowsJsons.size() && compare(predicate, table1RowsJsons.get(r).get(column1), table2RowsJsons.get(s).get(column2)) > 0)
+                    s++;
+                mark = s;
+            }
+            if (r < table1RowsJsons.size() && s < table2RowsJsons.size() &&
+                    compare(predicate, table1RowsJsons.get(r).get(column1), table2RowsJsons.get(s).get(column2)) == 0) {
+                result.add(mergeMaps(table1RowsJsons.get(r), table2RowsJsons.get(s), tableName1, tableName2));
+                s++;
+            } else {
+                s = mark;
+                r++;
+                mark = -1;
+            }
+        } while (r < table1RowsJsons.size() && s < table2RowsJsons.size());
+
+        return result;
     }
+
+    private Map<String, String> mergeMaps(Map<String, String> map1, Map<String, String> map2, String tableName1, String tableName2) {
+        Map<String, String> commmonMap = new HashMap<>();
+        for (String key : map1.keySet()) {
+            commmonMap.put(tableName1 + "." + key, map1.get(key));
+        }
+        for (String key : map2.keySet()) {
+            commmonMap.put(tableName2 + "." + key, map2.get(key));
+        }
+
+        return commmonMap;
+    }
+
 }

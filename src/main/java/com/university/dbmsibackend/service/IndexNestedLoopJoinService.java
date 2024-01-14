@@ -7,9 +7,6 @@ import com.university.dbmsibackend.service.api.JoinService;
 import com.university.dbmsibackend.util.JoinUtil;
 import com.university.dbmsibackend.util.JsonUtil;
 import lombok.AllArgsConstructor;
-import net.sf.jsqlparser.expression.Expression;
-import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
-import net.sf.jsqlparser.statement.select.Join;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
