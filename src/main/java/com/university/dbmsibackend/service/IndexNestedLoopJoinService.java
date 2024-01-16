@@ -35,6 +35,7 @@ public class IndexNestedLoopJoinService implements JoinService {
         } else if (!hasIndex1 && !hasIndex2) { // nestedLoop
             return simpleNestedLoop(tableName1, tableName2, column1, column2, databaseName, predicate);
         }
+        System.out.println("index nested with index");
         List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
         List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
         List<Map<String, String>> result = new ArrayList<>();
@@ -47,17 +48,21 @@ public class IndexNestedLoopJoinService implements JoinService {
             }
         }
 
+        System.out.println(result);
+
         return result;
     }
 
     @Override
     public List<Map<String, String>> secondJoin(List<Map<String, String>> rows, String tableName1, String tableName2,
                                                 String column1, String column2, String databaseName, Operation operation) {
+        System.out.println("second join");
         boolean hasIndex2 = jsonUtil.hasIndex(tableName2, column2, databaseName);
         List<Map<String, String>> result = new ArrayList<>();
         Table table2 = jsonUtil.getTable(tableName2, databaseName);
 
         if (hasIndex2) {
+            System.out.println("second join has index");
             List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
             for (Map<String, String> map1 : rows) {
                 for (IndexFileValue indexFileValue : table2IndexValues) {
@@ -67,6 +72,7 @@ public class IndexNestedLoopJoinService implements JoinService {
                 }
             }
         } else {
+            System.out.println("second join has not index");
             List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
             for (Map<String, String> map1 : rows) {
                 for (Map<String, String> map2 : table2RowsJsons) {
@@ -76,11 +82,13 @@ public class IndexNestedLoopJoinService implements JoinService {
                 }
             }
         }
+        System.out.println("second join result: " + result);
 
         return result;
     }
 
     private List<Map<String, String>> simpleNestedLoop(String tableName1, String tableName2, String column1, String column2, String databaseName, Operation predicate) {
+        System.out.println("simple nested loop");
         List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
         List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
         List<Map<String, String>> result = new ArrayList<>();
