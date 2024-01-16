@@ -1,5 +1,6 @@
 package com.university.dbmsibackend.service;
 
+import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.SelectItem;
 import org.springframework.stereotype.Service;
@@ -23,10 +24,11 @@ public class GroupByService {
                 ));
     }
 
-    List<Map<String, String>> filterRowsGroupBy(PlainSelect plainSelect, Map<List<String>, List<Map<String, String>>> rowsAfterGroupBy, List<String> groupByList) {
+    public List<Map<String, String>> filterRowsGroupBy(PlainSelect plainSelect, Map<List<String>, List<Map<String, String>>> rowsAfterGroupBy, List<String> groupByList) {
         List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
         List<Map<String, String>> rows = new ArrayList<>();
         List<String> operations = new ArrayList<>();
+        List<String> operationsName = new ArrayList<>();
 
         for (SelectItem selectItem : selectItems) {
             Pattern pCount = Pattern.compile("^count\\((.+)\\)$");
@@ -40,94 +42,124 @@ public class GroupByService {
 
             if (matcherCount.find()) {
                 operations.add("count");
+                operationsName.add(selectItem.toString());
             }
             if (matcherMin.find()) {
                 operations.add("min^" + matcherMin.group(1));
+                operationsName.add(selectItem.toString());
             }
             if (matcherMax.find()) {
                 operations.add("max^" + matcherMax.group(1));
+                operationsName.add(selectItem.toString());
             }
             if (matcherSum.find()) {
                 operations.add("sum^" + matcherSum.group(1));
+                operationsName.add(selectItem.toString());
             }
         }
-        handleMin(rows, rowsAfterGroupBy, groupByList, operations);
+        System.out.println(operations);
+        System.out.println(operationsName);
+        handleOperations(rows, rowsAfterGroupBy, groupByList, operations, operationsName);
 
         return rows;
     }
 
-    private void handleMin(List<Map<String, String>> rows, Map<List<String>,
-            List<Map<String, String>>> rowsAfterGroupBy, List<String> groupByList, List<String> operationList) {
+    private void handleOperations(List<Map<String, String>> rows, Map<List<String>,
+            List<Map<String, String>>> rowsAfterGroupBy, List<String> groupByList, List<String> operationList, List<String> selectItems) {
         rowsAfterGroupBy.forEach((keyList, value) -> {
             Map<String, String> map = new HashMap<>();
             for (int i = 0; i < groupByList.size(); i++) {
                 map.put(groupByList.get(i), keyList.get(i));
             }
 
-            for (String operation : operationList) {
-                if (operation.matches("count")) {
-                    map.put("count", String.valueOf(value.size()));
+            for (int i = 0; i < operationList.size(); i++) {
+                if (operationList.get(i).matches("count")) {
+                    map.put(selectItems.get(i), String.valueOf(value.size()));
                 }
-                if (operation.matches("min.*")) {
-                    String minKey = operation.split("\\^")[1];
-                    int minValue = 1_000_000;
-                    String minString = "zzzzzzzzzzzzz";
-                    for (Map<String, String> map2 : value) {
-                        if (canConvertToInt(map2.get(minKey))) {
-                            int intValue = Integer.parseInt(map2.get(minKey));
-                            minValue = Math.min(minValue, intValue);
-                        } else if (map2.get(minKey).compareTo(minString) < 0) {
-                            minString = map2.get(minKey);
-                        }
-                    }
-                    if (minValue != 1_000_000)
-                        map.put("min " + minKey, String.valueOf(minValue));
-                    else
-                        map.put("min " + minKey, minString);
+                if (operationList.get(i).matches("min.*")) {
+                    map = handleMin(map, operationList.get(i), value, selectItems.get(i));
                 }
-                if (operation.matches("max.*")) {
-                    String maxKey = operation.split("\\^")[1];
-                    int maxValue = -1;
-                    String maxString = "aaaaaaaaaaaaaa";
-                    for (Map<String, String> map2 : value) {
-                        if (canConvertToInt(map2.get(maxKey))) {
-                            int intValue = Integer.parseInt(map2.get(maxKey));
-                            maxValue = Math.max(maxValue, intValue);
-                        } else if (map2.get(maxKey).compareTo(maxString) > 0) {
-                            maxString = map2.get(maxKey);
-                        }
-                    }
-                    if (maxValue != -1)
-                        map.put("max " + maxKey, String.valueOf(maxValue));
-                    else
-                        map.put("max " + maxKey, maxString);
+                if (operationList.get(i).matches("max.*")) {
+                    map = handleMax(map, operationList.get(i), value, selectItems.get(i));
                 }
-                if (operation.matches("sum.*")) {
-                    String sumKey = operation.split("\\^")[1];
-                    int sum = 0;
-                    for (Map<String, String> map2 : value) {
-                        if (canConvertToInt(map2.get(sumKey))) {
-                            int intValue = Integer.parseInt(map2.get(sumKey));
-                            sum += intValue;
-                        }
-                    }
-                    map.put("sum " + sumKey, String.valueOf(sum));
+                if (operationList.get(i).matches("sum.*")) {
+                    map = handleSum(map, operationList.get(i), value, selectItems.get(i));
                 }
             }
-
+            System.out.println(map);
             rows.add(map);
         });
-
         System.out.println(rows);
+    }
+
+    private Map<String, String> handleSum(Map<String, String> map, String operation, List<Map<String, String>> value, String string) {
+        String sumKey = operation.split("\\^")[1];
+        int sum = 0;
+        for (Map<String, String> map2 : value) {
+            if (canConvertToInt(map2.get(sumKey))) {
+                int intValue = Integer.parseInt(map2.get(sumKey));
+                sum += intValue;
+            }
+        }
+        map.put(string, String.valueOf(sum));
+
+        return map;
+    }
+
+    private Map<String, String> handleMax(Map<String, String> map, String operation, List<Map<String, String>> value, String string) {
+        String maxKey = operation.split("\\^")[1];
+        int maxValue = -1;
+        String maxString = "aaaaaaaaaaaaaa";
+        for (Map<String, String> map2 : value) {
+            if (canConvertToInt(map2.get(maxKey))) {
+                int intValue = Integer.parseInt(map2.get(maxKey));
+                maxValue = Math.max(maxValue, intValue);
+            } else if (map2.get(maxKey).compareTo(maxString) > 0) {
+                maxString = map2.get(maxKey);
+            }
+        }
+        if (maxValue != -1)
+            map.put(string, String.valueOf(maxValue));
+        else
+            map.put(string, maxString);
+
+        return map;
+    }
+
+    private Map<String, String> handleMin(Map<String, String> map, String operation, List<Map<String, String>> value, String string) {
+        System.out.println("min " + string);
+        String minKey = operation.split("\\^")[1];
+        int minValue = 1_000_000;
+        String minString = "zzzzzzzzzzzzz";
+        for (Map<String, String> map2 : value) {
+            if (canConvertToInt(map2.get(minKey))) {
+                int intValue = Integer.parseInt(map2.get(minKey));
+                minValue = Math.min(minValue, intValue);
+            } else if (map2.get(minKey).compareTo(minString) < 0) {
+                minString = map2.get(minKey);
+            }
+        }
+        if (minValue != 1_000_000)
+            map.put(string, String.valueOf(minValue));
+        else
+            map.put(string, minString);
+
+        return map;
     }
 
     public static boolean canConvertToInt(String str) {
         try {
-            // Attempt to convert the string to an int
             Integer.parseInt(str);
-            return true; // Conversion successful
+            return true;
         } catch (NumberFormatException e) {
-            return false; // Conversion failed
+            return false;
         }
+    }
+
+    public List<Map<String, String>> handleHaving(Expression havingExpression, List<Map<String, String>> rowsAfterGroupBy) {
+        System.out.println(havingExpression);
+        System.out.println(rowsAfterGroupBy);
+
+        return rowsAfterGroupBy;
     }
 }

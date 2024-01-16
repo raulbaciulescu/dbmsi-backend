@@ -94,31 +94,19 @@ public class QueryService2 {
         } else throw new SelectQueryException("Something went wrong!");
     }
 
-    private List<Map<String, String>> handleCount(List<Map<String, String>> rows, Map<List<String>, List<Map<String, String>>> rowsAfterGroupBy, List<String> groupByList) {
-        rowsAfterGroupBy.forEach((keyList, value) -> {
-            Map<String, String> map = new HashMap<>();
-            for (int i = 0; i < groupByList.size(); i++) {
-                map.put(groupByList.get(i), keyList.get(i));
-            }
-            map.put("count", String.valueOf(value.size()));
-            rows.add(map);
-        });
-
-        System.out.println(rows);
-        return rows;
-    }
-
     private List<Map<String, String>> handleGroupBy(PlainSelect plainSelect, List<Map<String, String>> rows) {
         GroupByElement groupByExpression = plainSelect.getGroupBy();
+        Map<List<String>, List<Map<String, String>>> rowsAfterGroupBy;
 
         if (groupByExpression != null) {
             List<String> groupByList = groupByExpression.getGroupByExpressionList().stream().map(Object::toString).toList();
-            Map<List<String>, List<Map<String, String>>> rowsAfterGroupBy = groupByService.doGroupBy(groupByList, rows);
+            rowsAfterGroupBy = groupByService.doGroupBy(groupByList, rows);
             rows = groupByService.filterRowsGroupBy(plainSelect, rowsAfterGroupBy, groupByList);
-        }
-        Expression havingExpression = plainSelect.getHaving();
-        if (havingExpression != null) {
-            System.out.println(havingExpression);
+
+            Expression havingExpression = plainSelect.getHaving();
+            if (havingExpression != null) {
+                rows = groupByService.handleHaving(havingExpression, rows);
+            }
         }
 
         return rows;
@@ -160,68 +148,6 @@ public class QueryService2 {
         }
 
         return rows;
-    }
-
-    private List<SelectAllResponse> getRowsByPrimaryKeys(Map<String, List<String>> tableNamePrimaryKeysMap) {
-        MongoDatabase database = mongoClient.getDatabase(databaseName);
-        List<SelectAllResponse> response = new ArrayList<>();
-
-        for (String tableName : tableNamePrimaryKeysMap.keySet()) {
-            MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
-            FindIterable<Document> documents = collection.find(Filters.in("_id", tableNamePrimaryKeysMap.get(tableName)));
-            for (Document document : documents) {
-                response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
-            }
-        }
-
-        return response;
-    }
-
-    private List<SelectAllResponse> selectAll(Map<String, List<String>> tableNamePrimaryKeysMap) {
-        MongoDatabase database = mongoClient.getDatabase(databaseName);
-        List<SelectAllResponse> response = new ArrayList<>();
-
-        for (String tableName : tableNamePrimaryKeysMap.keySet()) {
-            MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
-            FindIterable<Document> documents = collection.find(Filters.in("_id", tableNamePrimaryKeysMap.get(tableName)));
-            for (Document document : documents) {
-                response.add(new SelectAllResponse(document.get("_id").toString(), document.get("value").toString()));
-            }
-        }
-
-        return response;
-    }
-
-    private static Object convertStringToCorrectType(String type, String value) {
-        return switch (type) {
-            case "varchar" -> value;
-            case "integer" -> Integer.parseInt(value);
-            case "float" -> Float.parseFloat(value);
-            case "bool" -> Boolean.parseBoolean(value);
-            default -> null;
-        };
-    }
-
-    private Map<String, Object> mapRow(String key, String value, Table table) {
-        String[] primaryKeys = key.split("#", -1);
-        String[] values = value.split("#", -1);
-
-        Map<String, Object> result = new HashMap<>();
-
-        int primaryKeysIndex = 0, valuesIndex = 0;
-        for (Attribute attribute : table.getAttributes()) {
-            if (table.getPrimaryKeys().contains(attribute.getName())) {
-                result.put(attribute.getName(),
-                        convertStringToCorrectType(attribute.getType(), primaryKeys[primaryKeysIndex]));
-                primaryKeysIndex++;
-            } else {
-                result.put(attribute.getName(),
-                        convertStringToCorrectType(attribute.getType(), values[valuesIndex]));
-                valuesIndex++;
-            }
-        }
-
-        return result;
     }
 
     /**
