@@ -61,13 +61,26 @@ public class WhereClauseService2 {
         if (leftExpression != null && rightExpression != null) {
             rows = rows.stream()
                     .filter(map -> {
-                        int intValue = Integer.parseInt(map.get(leftExpression.toString()));
-                        int intValueFromCondition = Integer.parseInt(rightExpression.toString());
-                        return intValue > intValueFromCondition;
+                        if (canConvertToInt(map.get(leftExpression.toString()))) {
+                            int intValue = Integer.parseInt(map.get(leftExpression.toString()));
+                            int intValueFromCondition = Integer.parseInt(rightExpression.toString());
+                            return intValue > intValueFromCondition;
+                        } else {
+                            return map.get(leftExpression.toString()).compareTo(rightExpression.toString()) > 0;
+                        }
                     })
                     .collect(Collectors.toList());
         }
         return rows;
+    }
+
+    public static boolean canConvertToInt(String str) {
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /**

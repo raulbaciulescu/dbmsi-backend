@@ -1,14 +1,14 @@
 package com.university.dbmsibackend.service;
 
 import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
+import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
+import net.sf.jsqlparser.expression.operators.relational.GreaterThan;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.SelectItem;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -156,10 +156,54 @@ public class GroupByService {
         }
     }
 
-    public List<Map<String, String>> handleHaving(Expression havingExpression, List<Map<String, String>> rowsAfterGroupBy) {
-        System.out.println(havingExpression);
-        System.out.println(rowsAfterGroupBy);
+    public List<Map<String, String>> handleHaving(Expression havingExpression, List<Map<String, String>> rows) {
+        switch (havingExpression.getClass().getSimpleName()) {
+            case "EqualsTo" -> rows = handleEqualsTo(rows, havingExpression);
+            case "GreaterThan" -> rows = handleGreaterThan(rows, havingExpression);
+            case "AndExpression" -> {
+                System.out.println("Handling AND having expression:");
+                AndExpression andExpression = (AndExpression) havingExpression;
+                rows = handleHaving(andExpression.getLeftExpression(), rows);
+                rows = handleHaving(andExpression.getRightExpression(), rows);
+            }
+            default -> System.out.println("Unhandled condition type: " + havingExpression.getClass().getSimpleName());
+        }
 
-        return rowsAfterGroupBy;
+        return rows;
+    }
+
+    private List<Map<String, String>> handleGreaterThan(List<Map<String, String>> rows, Expression havingExpression) {
+        System.out.println("Handling GreaterThan: " + havingExpression);
+        GreaterThan equalsTo = (GreaterThan) havingExpression;
+        Expression leftExpression = equalsTo.getLeftExpression();
+        Expression rightExpression = equalsTo.getRightExpression();
+        if (leftExpression != null && rightExpression != null) {
+            rows = rows.stream()
+                    .filter(map -> {
+                        if (canConvertToInt(map.get(leftExpression.toString()))) {
+                            int intValue = Integer.parseInt(map.get(leftExpression.toString()));
+                            int intValueFromCondition = Integer.parseInt(rightExpression.toString());
+                            return intValue > intValueFromCondition;
+                        } else {
+                            return map.get(leftExpression.toString()).compareTo(rightExpression.toString()) > 0;
+                        }
+                    })
+                    .collect(Collectors.toList());
+            System.out.println("rows after having greater than" + rows);
+        }
+        return rows;
+    }
+
+    private List<Map<String, String>> handleEqualsTo(List<Map<String, String>> rows, Expression havingExpression) {
+        EqualsTo equalsTo = (EqualsTo) havingExpression;
+        Expression leftExpression = equalsTo.getLeftExpression();
+        Expression rightExpression = equalsTo.getRightExpression();
+        if (leftExpression != null && rightExpression != null) {
+            rows = rows.stream()
+                    .filter(map -> Objects.equals(map.get(leftExpression.toString()), rightExpression.toString()))
+                    .collect(Collectors.toList());
+            System.out.println("rows after having equals" + rows);
+        }
+        return rows;
     }
 }
