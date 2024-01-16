@@ -30,10 +30,11 @@ public class SortMergeJoinService implements JoinService {
             temp = column1;
             column1 = column2;
             column2 = temp;
-        } else if (!hasIndex1) { // nestedLoop
+        } else if (!hasIndex1 && !hasIndex2) { // nestedLoop
             return sortMergeJoinWithoutIndex(tableName1, tableName2, column1, column2, databaseName, predicate);
         }
 
+        System.out.println("sort join with index");
         List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
         List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
         List<Map<String, String>> result = new ArrayList<>();
@@ -79,6 +80,7 @@ public class SortMergeJoinService implements JoinService {
         Table table2 = jsonUtil.getTable(tableName2, databaseName);
 
         if (hasIndex2) {
+            System.out.println("Second sort join hasIndex");
             List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
 
             String finalColumn1 = tableName1 + "." + column1;
@@ -111,6 +113,7 @@ public class SortMergeJoinService implements JoinService {
                 }
             } while (r < rows.size() && s < table2IndexValues.size());
         } else {
+            System.out.println("Second sort join hasn't Index");
             List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
             Comparator<Map<String, String>> mapComparator2 = (m1, m2) -> {
                 Integer i1 = Integer.parseInt(m1.get(column2));
@@ -154,6 +157,7 @@ public class SortMergeJoinService implements JoinService {
     }
 
     private List<Map<String, String>> sortMergeJoinWithoutIndex(String tableName1, String tableName2, String column1, String column2, String databaseName, Operation predicate) {
+        System.out.println("sort Join without index");
         List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
         List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
         List<Map<String, String>> result = new ArrayList<>();

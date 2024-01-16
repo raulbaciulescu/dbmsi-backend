@@ -32,7 +32,7 @@ public class IndexNestedLoopJoinService implements JoinService {
             temp = column1;
             column1 = column2;
             column2 = temp;
-        } else if (!hasIndex1) { // nestedLoop
+        } else if (!hasIndex1 && !hasIndex2) { // nestedLoop
             return simpleNestedLoop(tableName1, tableName2, column1, column2, databaseName, predicate);
         }
         List<Map<String, String>> table1RowsJsons = mongoService.getTableJsonList(tableName1, databaseName);
