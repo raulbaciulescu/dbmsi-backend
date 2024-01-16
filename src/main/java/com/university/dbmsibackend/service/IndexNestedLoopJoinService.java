@@ -76,7 +76,7 @@ public class IndexNestedLoopJoinService implements JoinService {
             List<Map<String, String>> table2RowsJsons = mongoService.getTableJsonList(tableName2, databaseName);
             for (Map<String, String> map1 : rows) {
                 for (Map<String, String> map2 : table2RowsJsons) {
-                    if (compare(operation, map2.get(column2), map1.get(tableName1 + "." + column1))) {
+                    if (compare(operation, map2.get(column1), map1.get(tableName2 + "." + column2))) {
                         result.add(joinUtil.mergeMaps(map1, map2, tableName1, tableName2));
                     }
                 }

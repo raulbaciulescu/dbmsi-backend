@@ -83,7 +83,7 @@ public class SortMergeJoinService implements JoinService {
             System.out.println("Second sort join hasIndex");
             List<IndexFileValue> table2IndexValues = mongoService.getIndexValues(tableName2, column2, databaseName);
 
-            String finalColumn1 = tableName1 + "." + column1;
+            String finalColumn1 = tableName2 + "." + column2;
             Comparator<Map<String, String>> mapComparator = (m1, m2) -> {
                 Integer i1 = Integer.parseInt(m1.get(finalColumn1));
                 Integer i2 = Integer.parseInt(m2.get(finalColumn1));
@@ -97,13 +97,13 @@ public class SortMergeJoinService implements JoinService {
             int mark = -1, r = 0, s = 0;
             do {
                 if (mark == -1) {
-                    while (r < rows.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2IndexValues.get(s).value()) < 0)
+                    while (r < rows.size() && compare(predicate, rows.get(r).get(tableName2 + "." + column2), table2IndexValues.get(s).value()) < 0)
                         r++;
-                    while (s < table2IndexValues.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2IndexValues.get(s).value()) > 0)
+                    while (s < table2IndexValues.size() && compare(predicate, rows.get(r).get(tableName2 + "." + column2), table2IndexValues.get(s).value()) > 0)
                         s++;
                     mark = s;
                 }
-                if (compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2IndexValues.get(s).value()) == 0) {
+                if (compare(predicate, rows.get(r).get(tableName2 + "." + column2), table2IndexValues.get(s).value()) == 0) {
                     result.addAll(joinUtil.mergeMapWithPrimaryKeys(rows.get(r), table2IndexValues.get(s).primaryKeys(), tableName1, table2, databaseName));
                     s++;
                 } else {
@@ -120,7 +120,7 @@ public class SortMergeJoinService implements JoinService {
                 Integer i2 = Integer.parseInt(m2.get(column2));
                 return i1.compareTo(i2);
             };
-            String finalColumn1 = tableName1 + "." + column1;
+            String finalColumn1 = tableName2 + "." + column2;
             Comparator<Map<String, String>> mapComparator = (m1, m2) -> {
                 Integer i1 = Integer.parseInt(m1.get(finalColumn1));
                 Integer i2 = Integer.parseInt(m2.get(finalColumn1));
@@ -131,14 +131,14 @@ public class SortMergeJoinService implements JoinService {
             int mark = -1, r = 0, s = 0;
             do {
                 if (mark == -1) {
-                    while (r < rows.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2RowsJsons.get(s).get(column2)) < 0)
+                    while (r < rows.size() && compare(predicate, rows.get(r).get(tableName2 + "." + column2), table2RowsJsons.get(s).get(column1)) < 0)
                         r++;
-                    while (s < table2RowsJsons.size() && compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2RowsJsons.get(s).get(column2)) > 0)
+                    while (s < table2RowsJsons.size() && compare(predicate, rows.get(r).get(tableName2 + "." + column2), table2RowsJsons.get(s).get(column1)) > 0)
                         s++;
                     mark = s;
                 }
                 if (r < rows.size() && s < table2RowsJsons.size() &&
-                        compare(predicate, rows.get(r).get(tableName1 + "." + column1), table2RowsJsons.get(s).get(column2)) == 0) {
+                        compare(predicate, rows.get(r).get(tableName2 + "." + column2), table2RowsJsons.get(s).get(column1)) == 0) {
                     result.add(joinUtil.mergeMaps(rows.get(r), table2RowsJsons.get(s), tableName1, tableName2));
                     s++;
                 } else {
@@ -149,6 +149,7 @@ public class SortMergeJoinService implements JoinService {
             } while (r < rows.size() && s < table2RowsJsons.size());
         }
 
+        System.out.println("result second sort join " + result);
         return result;
     }
 

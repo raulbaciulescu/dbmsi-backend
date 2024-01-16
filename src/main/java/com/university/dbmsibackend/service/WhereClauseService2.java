@@ -93,6 +93,7 @@ public class WhereClauseService2 {
      * @param expression
      */
     private List<Map<String, String>> handleEqualsTo(List<Map<String, String>> rows, Expression expression) {
+        System.out.println("handling equals");
         EqualsTo equalsTo = (EqualsTo) expression;
         Expression leftExpression = equalsTo.getLeftExpression();
         Expression rightExpression = equalsTo.getRightExpression();
