@@ -3,6 +3,7 @@ package com.university.dbmsibackend.service;
 import com.university.dbmsibackend.domain.*;
 import com.university.dbmsibackend.dto.CreateForeignKeyRequest;
 import com.university.dbmsibackend.dto.CreateIndexRequest;
+import com.university.dbmsibackend.service.api.ForeignKeyService;
 import com.university.dbmsibackend.util.JsonUtil;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,10 +15,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @AllArgsConstructor
-public class ForeignKeyService {
+public class ForeignKeyServiceImpl implements ForeignKeyService {
     private JsonUtil jsonUtil;
-    private IndexService indexService;
+    private IndexServiceImpl indexService;
 
+    @Override
     public void createForeignKey(CreateForeignKeyRequest request) {
         Catalog catalog = jsonUtil.getCatalog();
         Optional<Database> optionalDatabase = catalog.getDatabases()

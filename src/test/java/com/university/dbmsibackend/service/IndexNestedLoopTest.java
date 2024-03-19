@@ -23,7 +23,7 @@ class JoinTest {
     @Autowired
     private SortMergeJoinService sortMergeJoinService;
     @Autowired
-    private WhereClauseService2 whereClauseService;
+    private WhereClauseServiceImpl whereClauseService;
 
     @Test
     void doJoinTest() {

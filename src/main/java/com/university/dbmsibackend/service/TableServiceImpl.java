@@ -10,6 +10,8 @@ import com.university.dbmsibackend.dto.InsertRequest;
 import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.exception.EntityAlreadyExistsException;
 import com.university.dbmsibackend.exception.ForeignKeyViolationException;
+import com.university.dbmsibackend.service.api.IndexService;
+import com.university.dbmsibackend.service.api.TableService;
 import com.university.dbmsibackend.util.JsonUtil;
 import com.university.dbmsibackend.util.TableMapper;
 import com.university.dbmsibackend.validator.DbsmiValidator;
@@ -23,12 +25,18 @@ import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
-public class TableService {
+public class TableServiceImpl implements TableService {
     private JsonUtil jsonUtil;
     private MongoClient mongoClient;
     private MongoService mongoService;
     private IndexService indexService;
 
+    @Override
+    public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
+        return mongoService.selectAll(databaseName, tableName);
+    }
+
+    @Override
     public void createTable(CreateTableRequest request) {
         Catalog catalog = jsonUtil.getCatalog();
         Optional<Database> optionalDatabase = catalog.getDatabases()
@@ -55,6 +63,7 @@ public class TableService {
         }
     }
 
+    @Override
     public void dropTable(String databaseName, String tableName) {
         Catalog catalog = jsonUtil.getCatalog();
         Optional<Database> optionalDatabase = catalog.getDatabases()
@@ -81,29 +90,33 @@ public class TableService {
         }
     }
 
-    private void dropIndexFiles(Table table, String databaseName) {
-        MongoDatabase database = mongoClient.getDatabase(databaseName);
-        table.getIndexes().forEach((index -> {
-            MongoCollection<Document> collection = database.getCollection(table.getName() + "_" + index.getName() + ".ind");
-            collection.drop();
-        }));
-    }
-
-    private void dropTableFromMongo(String tableName, String databaseName) {
-        MongoDatabase database = mongoClient.getDatabase(databaseName);
-        MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
-        collection.drop();
-    }
-
-    private void checkIfTableIsLinkedWithOtherTables(Database database, String tableName) {
-        for (Table table : database.getTables()) {
-            for (ForeignKey foreignKey : table.getForeignKeys()) {
-                if (Objects.equals(foreignKey.getReferenceTable(), tableName))
-                    throw new ForeignKeyViolationException("Table is linked to " + table.getName() + " table!");
+    @Override
+    public void deleteRow(String databaseName, String tableName, List<String> primaryKeys) {
+        Catalog catalog = jsonUtil.getCatalog();
+        Optional<Database> optionalDatabase = catalog.getDatabases()
+                .stream()
+                .filter(db -> Objects.equals(db.getName(), databaseName))
+                .findFirst();
+        if (optionalDatabase.isPresent()) {
+            Optional<Table> optionalTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), tableName)).findFirst();
+            if (optionalTable.isPresent()) {
+                MongoDatabase database = mongoClient.getDatabase(databaseName);
+                MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+                FindIterable<Document> documents = collection.find();
+                List<Table> linkedForeignKeys = getLinkedTableWithForeignKey(databaseName, tableName);
+                for (Document document : documents) {
+                    if (primaryKeys.stream().anyMatch(s -> Objects.equals(s, document.get("_id").toString())))
+                        if (!existsContainsForeignKeys(document, optionalTable.get(), linkedForeignKeys, databaseName)) {
+                            collection.deleteOne(document);
+                            deleteFromIndexFiles(optionalTable.get(), databaseName, document);
+                        } else
+                            throw new ForeignKeyViolationException("A foreign key is used in other table!");
+                }
             }
         }
     }
 
+    @Override
     public void insertRow(InsertRequest request) {
         Catalog catalog = jsonUtil.getCatalog();
         Optional<Database> optionalDatabase = catalog.getDatabases()
@@ -158,31 +171,25 @@ public class TableService {
         collection.insertOne(document);
     }
 
-    public List<SelectAllResponse> selectAll(String databaseName, String tableName) {
-        return mongoService.selectAll(databaseName, tableName);
+    private void dropIndexFiles(Table table, String databaseName) {
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        table.getIndexes().forEach((index -> {
+            MongoCollection<Document> collection = database.getCollection(table.getName() + "_" + index.getName() + ".ind");
+            collection.drop();
+        }));
     }
 
-    public void deleteRow(String databaseName, String tableName, List<String> primaryKeys) {
-        Catalog catalog = jsonUtil.getCatalog();
-        Optional<Database> optionalDatabase = catalog.getDatabases()
-                .stream()
-                .filter(db -> Objects.equals(db.getName(), databaseName))
-                .findFirst();
-        if (optionalDatabase.isPresent()) {
-            Optional<Table> optionalTable = optionalDatabase.get().getTables().stream().filter(t -> Objects.equals(t.getName(), tableName)).findFirst();
-            if (optionalTable.isPresent()) {
-                MongoDatabase database = mongoClient.getDatabase(databaseName);
-                MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
-                FindIterable<Document> documents = collection.find();
-                List<Table> linkedForeignKeys = getLinkedTableWithForeignKey(databaseName, tableName);
-                for (Document document : documents) {
-                    if (primaryKeys.stream().anyMatch(s -> Objects.equals(s, document.get("_id").toString())))
-                        if (!existsContainsForeignKeys(document, optionalTable.get(), linkedForeignKeys, databaseName)) {
-                            collection.deleteOne(document);
-                            deleteFromIndexFiles(optionalTable.get(), databaseName, document);
-                        } else
-                            throw new ForeignKeyViolationException("A foreign key is used in other table!");
-                }
+    private void dropTableFromMongo(String tableName, String databaseName) {
+        MongoDatabase database = mongoClient.getDatabase(databaseName);
+        MongoCollection<Document> collection = database.getCollection(tableName + ".kv");
+        collection.drop();
+    }
+
+    private void checkIfTableIsLinkedWithOtherTables(Database database, String tableName) {
+        for (Table table : database.getTables()) {
+            for (ForeignKey foreignKey : table.getForeignKeys()) {
+                if (Objects.equals(foreignKey.getReferenceTable(), tableName))
+                    throw new ForeignKeyViolationException("Table is linked to " + table.getName() + " table!");
             }
         }
     }

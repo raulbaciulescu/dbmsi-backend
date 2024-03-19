@@ -7,10 +7,10 @@ import com.university.dbmsibackend.domain.Attribute;
 import com.university.dbmsibackend.domain.Index;
 import com.university.dbmsibackend.domain.IndexFileValue;
 import com.university.dbmsibackend.domain.Table;
-import com.university.dbmsibackend.dto.SelectAllResponse;
+import com.university.dbmsibackend.service.api.WhereClauseService;
 import com.university.dbmsibackend.util.JsonUtil;
 import com.university.dbmsibackend.util.Mapper;
-import com.university.dbmsibackend.util.TableMapper;
+import com.university.dbmsibackend.util.Util;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
@@ -23,15 +23,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-public class WhereClauseService2 {
+public class WhereClauseServiceImpl implements WhereClauseService {
     @Autowired
     private JsonUtil jsonUtil;
     @Autowired
     private MongoService mongoService;
-    private String databaseName;
 
+    @Override
     public List<Map<String, String>> handleWhereClause(Expression whereExpression, String databaseName, List<Map<String, String>> rows) {
-        this.databaseName = databaseName;
         rows = handleWhereClause(rows, whereExpression);
 
         return rows;
@@ -61,7 +60,7 @@ public class WhereClauseService2 {
         if (leftExpression != null && rightExpression != null) {
             rows = rows.stream()
                     .filter(map -> {
-                        if (canConvertToInt(map.get(leftExpression.toString()))) {
+                        if (Util.canConvertToInt(map.get(leftExpression.toString()))) {
                             int intValue = Integer.parseInt(map.get(leftExpression.toString()));
                             int intValueFromCondition = Integer.parseInt(rightExpression.toString());
                             return intValue > intValueFromCondition;
@@ -72,15 +71,6 @@ public class WhereClauseService2 {
                     .collect(Collectors.toList());
         }
         return rows;
-    }
-
-    public static boolean canConvertToInt(String str) {
-        try {
-            Integer.parseInt(str);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 
     /**
@@ -104,54 +94,5 @@ public class WhereClauseService2 {
             System.out.println("rows " + rows);
         }
         return rows;
-    }
-
-    private List<Dictionary<String, String>> intersectLists(List<Dictionary<String, String>> existingList, List<Dictionary<String, String>> newDictionaryList) {
-        List<Dictionary<String, String>> result = new ArrayList<>();
-
-        for (Dictionary<String, String> existingDict : existingList) {
-            for (Dictionary<String, String> newDict : newDictionaryList) {
-                if (existingDict.equals(newDict)) {
-                    result.add(existingDict);
-                    break;
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private List<IndexFileValue> hasIndexFile(String fieldName, String tableName) {
-        List<IndexFileValue> indexFileValues = new ArrayList<>();
-        boolean hasIndex = true;
-        Table table = jsonUtil.getTable(tableName, databaseName);
-        List<Index> indexes = table.getIndexes();
-        for (Index index : indexes) {
-            List<String> attributeNames = index.getAttributes().stream().map(Attribute::getName).toList();
-            if (attributeNames.contains(fieldName)) {
-                hasIndex = false;
-                MongoDatabase database = mongoService.getDatabase(databaseName);
-                MongoCollection<Document> collection = database.getCollection(tableName + "_" + index.getName() + ".ind");
-                FindIterable<Document> documents = collection.find();
-                indexFileValues = Mapper.mapToIndexFileValue(documents);
-            }
-        }
-
-        return indexFileValues;
-    }
-
-    private Object convertExpressionToCorrectType(Expression expression) {
-        if (expression instanceof LongValue) {
-            return (int) ((LongValue) expression).getValue();
-        } else if (expression instanceof DoubleValue) {
-            return (float) ((DoubleValue) expression).getValue();
-        } else if (expression instanceof StringValue) {
-            return ((StringValue) expression).getValue();
-        } else if (expression instanceof NullValue) {
-            return null;
-        } else {
-            // Handle other data types or use a default conversion based on your needs
-            return expression.toString();
-        }
     }
 }

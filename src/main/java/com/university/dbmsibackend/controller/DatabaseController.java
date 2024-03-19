@@ -3,7 +3,7 @@ package com.university.dbmsibackend.controller;
 import com.university.dbmsibackend.domain.Database;
 import com.university.dbmsibackend.dto.CreateDatabaseRequest;
 import com.university.dbmsibackend.exception.EntityAlreadyExistsException;
-import com.university.dbmsibackend.service.DatabaseService;
+import com.university.dbmsibackend.service.api.DatabaseService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;

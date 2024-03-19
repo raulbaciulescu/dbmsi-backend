@@ -1,5 +1,7 @@
 package com.university.dbmsibackend.service;
 
+import com.university.dbmsibackend.service.api.GroupByService;
+import com.university.dbmsibackend.util.Util;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
@@ -14,7 +16,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
-public class GroupByService {
+public class GroupByServiceImpl implements GroupByService {
+    @Override
     public Map<List<String>, List<Map<String, String>>> doGroupBy(List<String> groupByList, List<Map<String, String>> rows) {
         return rows.stream()
                 .collect(Collectors.groupingBy(map ->
@@ -24,6 +27,7 @@ public class GroupByService {
                 ));
     }
 
+    @Override
     public List<Map<String, String>> filterRowsGroupBy(PlainSelect plainSelect, Map<List<String>, List<Map<String, String>>> rowsAfterGroupBy, List<String> groupByList) {
         List<SelectItem<?>> selectItems = plainSelect.getSelectItems();
         List<Map<String, String>> rows = new ArrayList<>();
@@ -64,6 +68,23 @@ public class GroupByService {
         return rows;
     }
 
+    @Override
+    public List<Map<String, String>> handleHaving(Expression havingExpression, List<Map<String, String>> rows) {
+        switch (havingExpression.getClass().getSimpleName()) {
+            case "EqualsTo" -> rows = handleEqualsTo(rows, havingExpression);
+            case "GreaterThan" -> rows = handleGreaterThan(rows, havingExpression);
+            case "AndExpression" -> {
+                System.out.println("Handling AND having expression:");
+                AndExpression andExpression = (AndExpression) havingExpression;
+                rows = handleHaving(andExpression.getLeftExpression(), rows);
+                rows = handleHaving(andExpression.getRightExpression(), rows);
+            }
+            default -> System.out.println("Unhandled condition type: " + havingExpression.getClass().getSimpleName());
+        }
+
+        return rows;
+    }
+
     private void handleOperations(List<Map<String, String>> rows, Map<List<String>,
             List<Map<String, String>>> rowsAfterGroupBy, List<String> groupByList, List<String> operationList, List<String> selectItems) {
         rowsAfterGroupBy.forEach((keyList, value) -> {
@@ -96,7 +117,7 @@ public class GroupByService {
         String sumKey = operation.split("\\^")[1];
         int sum = 0;
         for (Map<String, String> map2 : value) {
-            if (canConvertToInt(map2.get(sumKey))) {
+            if (Util.canConvertToInt(map2.get(sumKey))) {
                 int intValue = Integer.parseInt(map2.get(sumKey));
                 sum += intValue;
             }
@@ -111,7 +132,7 @@ public class GroupByService {
         int maxValue = -1;
         String maxString = "aaaaaaaaaaaaaa";
         for (Map<String, String> map2 : value) {
-            if (canConvertToInt(map2.get(maxKey))) {
+            if (Util.canConvertToInt(map2.get(maxKey))) {
                 int intValue = Integer.parseInt(map2.get(maxKey));
                 maxValue = Math.max(maxValue, intValue);
             } else if (map2.get(maxKey).compareTo(maxString) > 0) {
@@ -132,7 +153,7 @@ public class GroupByService {
         int minValue = 1_000_000;
         String minString = "zzzzzzzzzzzzz";
         for (Map<String, String> map2 : value) {
-            if (canConvertToInt(map2.get(minKey))) {
+            if (Util.canConvertToInt(map2.get(minKey))) {
                 int intValue = Integer.parseInt(map2.get(minKey));
                 minValue = Math.min(minValue, intValue);
             } else if (map2.get(minKey).compareTo(minString) < 0) {
@@ -147,40 +168,15 @@ public class GroupByService {
         return map;
     }
 
-    public static boolean canConvertToInt(String str) {
-        try {
-            Integer.parseInt(str);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    public List<Map<String, String>> handleHaving(Expression havingExpression, List<Map<String, String>> rows) {
-        switch (havingExpression.getClass().getSimpleName()) {
-            case "EqualsTo" -> rows = handleEqualsTo(rows, havingExpression);
-            case "GreaterThan" -> rows = handleGreaterThan(rows, havingExpression);
-            case "AndExpression" -> {
-                System.out.println("Handling AND having expression:");
-                AndExpression andExpression = (AndExpression) havingExpression;
-                rows = handleHaving(andExpression.getLeftExpression(), rows);
-                rows = handleHaving(andExpression.getRightExpression(), rows);
-            }
-            default -> System.out.println("Unhandled condition type: " + havingExpression.getClass().getSimpleName());
-        }
-
-        return rows;
-    }
-
-    private List<Map<String, String>> handleGreaterThan(List<Map<String, String>> rows, Expression havingExpression) {
-        System.out.println("Handling GreaterThan: " + havingExpression);
-        GreaterThan equalsTo = (GreaterThan) havingExpression;
+    private List<Map<String, String>> handleGreaterThan(List<Map<String, String>> rows, Expression expression) {
+        System.out.println("Handling GreaterThan: " + expression);
+        GreaterThan equalsTo = (GreaterThan) expression;
         Expression leftExpression = equalsTo.getLeftExpression();
         Expression rightExpression = equalsTo.getRightExpression();
         if (leftExpression != null && rightExpression != null) {
             rows = rows.stream()
                     .filter(map -> {
-                        if (canConvertToInt(map.get(leftExpression.toString()))) {
+                        if (Util.canConvertToInt(map.get(leftExpression.toString()))) {
                             int intValue = Integer.parseInt(map.get(leftExpression.toString()));
                             int intValueFromCondition = Integer.parseInt(rightExpression.toString());
                             return intValue > intValueFromCondition;
@@ -189,7 +185,6 @@ public class GroupByService {
                         }
                     })
                     .collect(Collectors.toList());
-            System.out.println("rows after having greater than" + rows);
         }
         return rows;
     }

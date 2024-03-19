@@ -36,14 +36,14 @@ class JoinExecutor {
                 column2 = Arrays.stream(rightParameter.split("\\.")).toList().get(1);
             }
             if (rows.isEmpty()) {
-                    rows = joinService.doJoin(
-                            tableName1,
-                            tableName2,
-                            column1,
-                            column2,
-                            databaseName,
-                            Operation.EQUALS
-                    );
+                rows = joinService.doJoin(
+                        tableName1,
+                        tableName2,
+                        column1,
+                        column2,
+                        databaseName,
+                        Operation.EQUALS
+                );
             } else
                 rows = joinService.secondJoin(
                         rows,

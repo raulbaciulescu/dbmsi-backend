@@ -7,6 +7,7 @@ import com.university.dbmsibackend.dto.CreateIndexRequest;
 import com.university.dbmsibackend.dto.InsertRequest;
 import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.exception.EntityAlreadyExistsException;
+import com.university.dbmsibackend.service.api.IndexService;
 import com.university.dbmsibackend.util.JsonUtil;
 import lombok.AllArgsConstructor;
 import org.bson.Document;
@@ -20,10 +21,11 @@ import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
-public class IndexService {
+public class IndexServiceImpl implements IndexService {
     private JsonUtil jsonUtil;
     private MongoService mongoService;
 
+    @Override
     public void createIndex(CreateIndexRequest request) {
         Catalog catalog = jsonUtil.getCatalog();
         Optional<Database> optionalDatabase = catalog.getDatabases()
@@ -43,7 +45,8 @@ public class IndexService {
         });
     }
 
-    private void saveAllRowsInIndexFile(Index index, String databaseName, Table table) {
+    @Override
+    public void saveAllRowsInIndexFile(Index index, String databaseName, Table table) {
         List<SelectAllResponse> rows = mongoService.selectAll(databaseName, table.getName());
         rows.forEach(row -> {
             List<String> indexValues = getValuesForIndexAttributes(index, table, row.value());
@@ -51,18 +54,24 @@ public class IndexService {
         });
     }
 
-    public Index setIndex(Table table, CreateIndexRequest request) {
-        Index index = Index
-                .builder()
-                .name(request.name())
-                .type(request.type())
-                .isUnique(request.isUnique())
-                .attributes(request.attributes())
-                .build();
-        table.getIndexes().add(index);
-        return index;
+    @Override
+    public void addIndexFilesForUniqueAttributes(List<Attribute> attributes, String tableName, String databaseName) {
+        attributes.forEach(attribute -> {
+            if (attribute.getIsUnique()) {
+                CreateIndexRequest createIndexRequest = new CreateIndexRequest(
+                        attribute.getName(),
+                        true,
+                        "BTree",
+                        tableName,
+                        databaseName,
+                        List.of(attribute)
+                );
+                createIndex(createIndexRequest);
+            }
+        });
     }
 
+    @Override
     public void insertInIndexFiles(Table table, InsertRequest request) {
         List<Index> indexList = table.getIndexes();
         for (Index index : indexList) {
@@ -78,6 +87,18 @@ public class IndexService {
             } else
                 insertInNonUniqueIndex(request, String.join("#", indexValues), index.getName());
         }
+    }
+
+    private Index setIndex(Table table, CreateIndexRequest request) {
+        Index index = Index
+                .builder()
+                .name(request.name())
+                .type(request.type())
+                .isUnique(request.isUnique())
+                .attributes(request.attributes())
+                .build();
+        table.getIndexes().add(index);
+        return index;
     }
 
     private void checkForErrors(InsertRequest request, String uniqueKey, String indexName) {
@@ -96,7 +117,7 @@ public class IndexService {
      *
      * @return returneaza valorile pentru coloanele din tabel care au index
      */
-    public List<String> getValuesForIndexAttributes(Index index, Table table, String value) {
+    private List<String> getValuesForIndexAttributes(Index index, Table table, String value) {
         List<String> attributesValue = List.of(value.split("#"));
         List<String> indexAttributes = index.getAttributes().stream().map(Attribute::getName).toList();
         int untilPrimaryKey = table.getPrimaryKeys().size();
@@ -116,7 +137,7 @@ public class IndexService {
         return indexValues;
     }
 
-    public void insertInNonUniqueIndex(InsertRequest request, String nonUniqueKey, String indexName) {
+    private void insertInNonUniqueIndex(InsertRequest request, String nonUniqueKey, String indexName) {
         MongoDatabase database = mongoService.getDatabase(request.databaseName());
         MongoCollection<Document> collection = database.getCollection(request.tableName() + "_" + indexName + ".ind");
         Document query = new Document("_id", nonUniqueKey);
@@ -131,7 +152,7 @@ public class IndexService {
         }
     }
 
-    public void insertInNonUniqueIndex2(String primaryKey, String nonUniqueKey, String indexName, String databaseName, String tableName) {
+    private void insertInNonUniqueIndex2(String primaryKey, String nonUniqueKey, String indexName, String databaseName, String tableName) {
         MongoDatabase database = mongoService.getDatabase(databaseName);
         MongoCollection<Document> collection = database.getCollection(tableName + "_" + indexName + ".ind");
         Document query = new Document("_id", nonUniqueKey);
@@ -146,7 +167,7 @@ public class IndexService {
         }
     }
 
-    public void insertInUniqueIndex(InsertRequest request, String uniqueKey, String indexName) {
+    private void insertInUniqueIndex(InsertRequest request, String uniqueKey, String indexName) {
         MongoDatabase database = mongoService.getDatabase(request.databaseName());
         MongoCollection<Document> collection = database.getCollection(request.tableName() + "_" + indexName + ".ind");
         Document query = new Document("_id", uniqueKey);
@@ -157,21 +178,5 @@ public class IndexService {
             Document document = new Document("_id", uniqueKey).append("primary-key", request.key());
             collection.insertOne(document);
         }
-    }
-
-    public void addIndexFilesForUniqueAttributes(List<Attribute> attributes, String tableName, String databaseName) {
-        attributes.forEach(attribute -> {
-            if (attribute.getIsUnique()) {
-                CreateIndexRequest createIndexRequest = new CreateIndexRequest(
-                        attribute.getName(),
-                        true,
-                        "BTree",
-                        tableName,
-                        databaseName,
-                        List.of(attribute)
-                );
-                createIndex(createIndexRequest);
-            }
-        });
     }
 }

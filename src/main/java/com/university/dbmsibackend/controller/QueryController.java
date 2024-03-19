@@ -1,8 +1,7 @@
 package com.university.dbmsibackend.controller;
 
 import com.university.dbmsibackend.dto.QueryRequest;
-import com.university.dbmsibackend.service.QueryService;
-import com.university.dbmsibackend.service.QueryService2;
+import com.university.dbmsibackend.service.api.QueryService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +14,7 @@ import java.util.Map;
 @RequestMapping(("/sqlCommand"))
 @CrossOrigin(origins = "http://localhost:3000")
 public class QueryController {
-    private QueryService2 service;
+    private QueryService service;
     
     @PostMapping
     @ResponseStatus(HttpStatus.OK)

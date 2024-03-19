@@ -1,18 +1,16 @@
 package com.university.dbmsibackend.service;
 
-import com.mongodb.client.FindIterable;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Filters;
-import com.university.dbmsibackend.domain.Attribute;
 import com.university.dbmsibackend.domain.Table;
 import com.university.dbmsibackend.dto.QueryRequest;
 import com.university.dbmsibackend.dto.SelectAllResponse;
 import com.university.dbmsibackend.exception.SelectQueryException;
+import com.university.dbmsibackend.service.api.GroupByService;
+import com.university.dbmsibackend.service.api.QueryService;
+import com.university.dbmsibackend.service.api.WhereClauseService;
 import com.university.dbmsibackend.util.JsonUtil;
 import com.university.dbmsibackend.util.Mapper;
 import com.university.dbmsibackend.util.TableMapper;
+import com.university.dbmsibackend.util.Util;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -21,44 +19,33 @@ import net.sf.jsqlparser.statement.select.GroupByElement;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectItem;
-import org.bson.Document;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
-public class QueryService2 {
-    private final MongoClient mongoClient;
+public class QueryServiceImpl implements QueryService {
     private final MongoService mongoService;
-    private final WhereClauseService2 whereClauseService;
-    private final JoinServiceTemp joinServiceTemp;
-    private final IndexNestedLoopJoinService indexNestedLoopJoinService;
+    private final WhereClauseService whereClauseService;
     private final JsonUtil jsonUtil;
     private String databaseName;
     private final JoinExecutor joinExecutor;
     private final GroupByService groupByService;
 
-    public QueryService2(JsonUtil jsonUtil,
-                         MongoClient mongoClient,
-                         MongoService mongoService,
-                         WhereClauseService2 whereClauseService,
-                         IndexNestedLoopJoinService indexNestedLoopJoinService,
-                         GroupByService groupByService,
-                         JoinServiceTemp joinServiceTemp,
-                         JoinExecutor joinExecutor) {
+    public QueryServiceImpl(JsonUtil jsonUtil,
+                            MongoService mongoService,
+                            WhereClauseService whereClauseService,
+                            GroupByService groupByService,
+                            JoinExecutor joinExecutor) {
         this.jsonUtil = jsonUtil;
-        this.mongoClient = mongoClient;
         this.mongoService = mongoService;
         this.whereClauseService = whereClauseService;
-        this.joinServiceTemp = joinServiceTemp;
-        this.indexNestedLoopJoinService = indexNestedLoopJoinService;
         this.joinExecutor = joinExecutor;
         this.groupByService = groupByService;
         this.databaseName = "";
     }
 
+    @Override
     public List<Map<String, String>> executeQuery(QueryRequest request) {
         String query = request.query();
         databaseName = request.databaseName();
@@ -80,9 +67,7 @@ public class QueryService2 {
 
     private List<Map<String, String>> processSelectBodyTree(Select selectBody) {
         if (selectBody instanceof PlainSelect plainSelect) {
-            List<Map<String, String>> rows = new ArrayList<>();
-            Map<List<String>, List<Map<String, String>>> rowsAfterGroupBy;
-
+            List<Map<String, String>> rows;
             rows = handleJoin(plainSelect);
             rows = handleWhere(plainSelect, rows);
             if (plainSelect.getGroupBy() != null) {
@@ -160,7 +145,6 @@ public class QueryService2 {
      * {"id": 1, "groupName": "da"}
      *
      * @param selectItems [name, age]
-     * @return
      */
     private List<Map<String, String>> filterSelectFields(List<Map<String, String>> rows, List<String> selectItems, boolean distinctFlag) {
         List<Map<String, String>> result = new ArrayList<>();
@@ -174,7 +158,7 @@ public class QueryService2 {
             }
             if (distinctFlag) {
                 var theSame = result.stream()
-                        .filter(json -> areMapsEqual(json, resultJson))
+                        .filter(json -> Util.areMapsEqual(json, resultJson))
                         .toList();
                 if (theSame.isEmpty())
                     result.add(resultJson);
@@ -183,27 +167,5 @@ public class QueryService2 {
         }
 
         return result;
-    }
-
-    public static boolean areMapsEqual(Map<String, String> map1, Map<String, String> map2) {
-        if (map1 == null && map2 == null) {
-            return true;
-        }
-
-        if (map1 == null || map2 == null || map1.size() != map2.size()) {
-            return false;
-        }
-
-        for (Map.Entry<String, String> entry : map1.entrySet()) {
-            String key = entry.getKey();
-            Object value1 = entry.getValue();
-            Object value2 = map2.get(key);
-
-            if (!Objects.equals(value1, value2)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

@@ -3,9 +3,9 @@
 //import com.university.dbmsibackend.domain.Attribute;
 //import com.university.dbmsibackend.domain.ForeignKey;
 //import com.university.dbmsibackend.dto.*;
-//import com.university.dbmsibackend.service.DatabaseService;
-//import com.university.dbmsibackend.service.ForeignKeyService;
-//import com.university.dbmsibackend.service.IndexService;
+//import com.university.dbmsibackend.service.api.DatabaseService;
+//import com.university.dbmsibackend.service.api.ForeignKeyService;
+//import com.university.dbmsibackend.service.api.IndexService;
 //import com.university.dbmsibackend.service.TableService;
 //import org.springframework.beans.factory.annotation.Autowired;
 //import org.springframework.boot.CommandLineRunner;
